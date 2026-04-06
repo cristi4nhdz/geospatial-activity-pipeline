@@ -1,0 +1,19 @@
+# environment.yaml
+---
+name: geo-pipeline
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - pip
+  - pip:
+      - kafka-python
+      - psycopg2-binary
+      - python-dotenv
+      - requests
+      - websockets
+      - pydantic
+      - loguru
+      - pytest
+      - pyyaml

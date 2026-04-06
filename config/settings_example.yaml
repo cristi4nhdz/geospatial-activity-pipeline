@@ -1,0 +1,16 @@
+# config/settings_example.yaml
+---
+kafka:
+  bootstrap_servers: kafka:29092
+  topics:
+    vessels: ais.vessels
+    aircraft: adsb.aircraft
+
+ais:
+  api_key: "YOUR_AISSTREAM_API_KEY_HERE"
+  ws_url: "wss://stream.aisstream.io/v0/stream"
+
+opensky:
+  username: "YOUR_OPENSKY_USERNAME_HERE"
+  password: "YOUR_OPENSKY_PASSWORD_HERE"
+  base_url: "https://opensky-network.org/api"
