@@ -9,8 +9,18 @@ kafka:
 ais:
   api_key: "YOUR_AISSTREAM_API_KEY_HERE"
   ws_url: "wss://stream.aisstream.io/v0/stream"
+  bounding_box:
+    min_lat: 1.0
+    max_lat: 1.6
+    min_lon: 103.5
+    max_lon: 104.5
 
 opensky:
   username: "YOUR_OPENSKY_USERNAME_HERE"
   password: "YOUR_OPENSKY_PASSWORD_HERE"
   base_url: "https://opensky-network.org/api"
+  bounding_box:
+    min_lat: 1.0
+    max_lat: 1.6
+    min_lon: 103.5
+    max_lon: 104.5
