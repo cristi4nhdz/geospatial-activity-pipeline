@@ -1,2 +1,4 @@
 settings.yaml
 config/__pycache__
+ingestion/__pycache__
+.vscode
