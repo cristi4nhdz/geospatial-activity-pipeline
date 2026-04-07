@@ -1,5 +1,7 @@
 # docker/docker-compose.yaml
 ---
+name: geospatial-pipeline
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
