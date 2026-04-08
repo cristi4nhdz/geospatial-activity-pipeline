@@ -1,6 +1,6 @@
 # Geospatial Activity Pipeline
 
-A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, stores spatial tracks in PostgreSQL/PostGIS with GIST-indexed geometry columns, with configurable bounding box AOIs, automatic WebSocket reconnection, and normalized JSON events published to Kafka.
+A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, and stores areas of interest as polygons for downstream spatial querying.
 
 ---
 
@@ -9,29 +9,43 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
+- [Features](#features)
 - [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Environment Setup](#environment-setup)
+  - [Running the Pipeline](#running-the-pipeline)
 - [Project Structure](#project-structure)
 
 ---
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw messages and publishes them to Kafka topics. Consumers read from Kafka and upsert vessel and aircraft tracks into a PostGIS spatial database with indexed geometry columns.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries.
 
 ---
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-    A[AISStream WebSocket] -->|vessel pings| B[ais_producer.py]
-    C[OpenSky REST API] -->|aircraft states| D[adsb_producer.py]
-    B -->|JSON| E[Kafka\nais.vessels]
-    D -->|JSON| F[Kafka\nadsb.aircraft]
-    E -->|consume| G[vessel_consumer.py]
-    F -->|consume| H[aircraft_consumer.py]
-    G -->|upsert| I[PostGIS\nvessel_tracks]
-    H -->|upsert| J[PostGIS\naircraft_tracks]
+flowchart TD
+    subgraph Sources["Ingestion Sources"]
+        AIS["AISStream\nWebSocket"]
+        OpenSky["OpenSky Network\nREST API"]
+    end
+
+    subgraph Kafka["Kafka Event Bus"]
+        K1["ais.vessels"]
+        K2["adsb.aircraft"]
+    end
+
+    subgraph Storage["Storage"]
+        PG["PostgreSQL/PostGIS\nvessel_tracks\naircraft_tracks\naoi"]
+    end
+
+    AIS -->|vessel pings| K1
+    OpenSky -->|aircraft states| K2
+    K1 -->|consume| PG
+    K2 -->|consume| PG
 ```
 
 ---
@@ -40,11 +54,22 @@ flowchart LR
 
 | Layer | Technology |
 | ------- | ------------ |
-| Streaming | Apache Kafka + Zookeeper |
-| Geospatial DB | PostgreSQL + PostGIS |
-| Infrastructure | Docker Compose |
 | Language | Python 3.13 |
-| Config | YAML |
+| Messaging | Apache Kafka |
+| Geospatial DB | PostgreSQL + PostGIS |
+| Orchestration | Docker Compose |
+| Environment | Conda |
+
+---
+
+## Features
+
+- **2-Source Ingestion** — AISStream WebSocket and OpenSky Network REST API publishing live vessel and aircraft positions to Kafka
+- **AIS Normalization** — Handles Class A, Class B Standard, and Class B Extended position reports, normalizing MMSI, vessel name, coordinates, speed, heading, course, and navigational status
+- **ADS-B Normalization** — Filters airborne-only records and normalizes ICAO24, callsign, origin country, altitude, velocity, heading, and vertical rate
+- **Configurable AOI** — Bounding boxes per data source defined in YAML config, no hardcoded coordinates
+- **PostGIS Spatial Schema** — Three tables with `GEOMETRY(Point/Polygon, 4326)` columns and GIST spatial indexes: `vessel_tracks`, `aircraft_tracks`, and `aoi`
+- **Config-Driven** — YAML-based configuration for Kafka topics, bounding boxes, and API credentials
 
 ---
 
@@ -52,10 +77,9 @@ flowchart LR
 
 ### Prerequisites
 
+- [Docker Desktop](https://www.docker.com/)
+- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda
 - Python 3.13
-- Conda
-- Docker Desktop
-- Git
 
 ### Accounts Required
 
@@ -66,19 +90,31 @@ flowchart LR
 
 ### Environment Setup
 
+**1. Clone the repository:**
+
 ```bash
 # Clone the repo
 git clone https://github.com/cristi4nhdz/geospatial-activity-pipeline.git
 cd geospatial-activity-pipeline
+```
 
-# Create conda environment
+**2. Configure your environment:**
+
+```bash
+cp config/settings_example.yaml config/settings.yaml
+# edit settings.yaml with your API keys and credentials
+```
+
+**3. Create a local Conda environment:**
+
+```bash
 conda env create -f environment.yaml
 conda activate geo-pipeline
+```
 
-# Copy config and fill in credentials
-cp config/settings_example.yaml config/settings.yaml
+**4. Start the Docker stack:**
 
-# Start Docker stack
+```bash
 docker compose -f docker/docker-compose.yaml up -d
 ```
 
@@ -115,7 +151,6 @@ geospatial-activity-pipeline/
 │   |-- config_loader.py
 │   |-- logging_config.py
 |-- logs/
-|-- .gitignore
 |-- environment.yaml
 |-- README.md
 ```
