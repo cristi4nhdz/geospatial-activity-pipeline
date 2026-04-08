@@ -41,7 +41,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "geo"]
+      test: ["CMD", "pg_isready", "-U", "geo", "-d", "geopipeline"]
       interval: 5s
       retries: 5
 
