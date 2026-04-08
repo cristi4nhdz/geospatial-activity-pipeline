@@ -1,2 +1,2 @@
--- docker/postgres/init.sq
+-- docker/postgres/init.sql
 CREATE EXTENSION IF NOT EXISTS postgis;
