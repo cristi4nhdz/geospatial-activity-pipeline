@@ -93,7 +93,7 @@ def main() -> None:
     cursor = conn.cursor()
 
     logger.info(
-        "Vessel consumer started — listening on %s",
+        "Vessel consumer started, listening on %s",
         config["kafka"]["topics"]["vessels"],
     )
 

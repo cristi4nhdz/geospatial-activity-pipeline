@@ -28,7 +28,7 @@ def setup_logging(log_file: str = "app.log") -> None:
 
     # logging.basicConfig(
     #    level=logging.INFO,
-    #    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    #    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
     #    handlers=[
     #        logging.FileHandler("/app/logs/ingestion.log"),
     #        logging.StreamHandler(),
@@ -38,7 +38,7 @@ def setup_logging(log_file: str = "app.log") -> None:
     # local dev
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
         handlers=[
             logging.FileHandler(rf"logs\{log_file}"),
             logging.StreamHandler(),
