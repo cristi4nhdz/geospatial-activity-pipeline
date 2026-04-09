@@ -38,14 +38,21 @@ flowchart TD
         K2["adsb.aircraft"]
     end
 
+    subgraph Consumers["Kafka Consumers"]
+        C1["vessel_consumer.py"]
+        C2["aircraft_consumer.py"]
+    end
+
     subgraph Storage["Storage"]
         PG["PostgreSQL/PostGIS\nvessel_tracks\naircraft_tracks\naoi"]
     end
 
     AIS -->|vessel pings| K1
     OpenSky -->|aircraft states| K2
-    K1 -->|consume| PG
-    K2 -->|consume| PG
+    K1 -->|consume| C1
+    K2 -->|consume| C2
+    C1 -->|upsert| PG
+    C2 -->|insert| PG
 ```
 
 ---
@@ -68,8 +75,10 @@ flowchart TD
 - **AIS Normalization** — Handles Class A, Class B Standard, and Class B Extended position reports, normalizing MMSI, vessel name, coordinates, speed, heading, course, and navigational status
 - **ADS-B Normalization** — Filters airborne-only records and normalizes ICAO24, callsign, origin country, altitude, velocity, heading, and vertical rate
 - **Configurable AOI** — Bounding boxes per data source defined in YAML config, no hardcoded coordinates
+- **WebSocket Reconnection** — AIS producer automatically reconnects on connection drop
 - **PostGIS Spatial Schema** — Three tables with `GEOMETRY(Point/Polygon, 4326)` columns and GIST spatial indexes: `vessel_tracks`, `aircraft_tracks`, and `aoi`
-- **Config-Driven** — YAML-based configuration for Kafka topics, bounding boxes, and API credentials
+- **Consumer Lag Monitor** — Reports committed vs end offsets per consumer group and partition on a configurable interval
+- **Config-Driven** — YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, and API credentials
 
 ---
 
@@ -126,6 +135,15 @@ python -m ingestion.ais_producer
 
 # ADS-B aircraft producer
 python -m ingestion.adsb_producer
+
+# Vessel consumer
+python -m ingestion.consumers.vessel_consumer
+
+# Aircraft consumer
+python -m ingestion.consumers.aircraft_consumer
+
+# Lag monitor
+python -m ingestion.consumers.lag_monitor
 ```
 
 ---
@@ -142,6 +160,11 @@ geospatial-activity-pipeline/
 │   |-- __init__.py
 │   |-- ais_producer.py
 │   |-- adsb_producer.py
+|   |-- consumers/
+|       |-- __init__.py
+|       |-- vessel_consumer.py
+|       |-- aircraft_consumer.py
+|       |-- lag_monitor.py
 |-- db/
 │   |-- schema.sql
 │   |-- queries/
