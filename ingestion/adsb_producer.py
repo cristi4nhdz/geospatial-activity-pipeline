@@ -14,7 +14,7 @@ from kafka import KafkaProducer
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("adsb.log")
+setup_logging("adsb_producer.log")
 
 logger = logging.getLogger(__name__)
 

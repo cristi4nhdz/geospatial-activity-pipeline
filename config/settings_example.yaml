@@ -24,3 +24,10 @@ opensky:
     max_lat: 1.6
     min_lon: 103.5
     max_lon: 104.5
+
+postgis:
+  host: localhost
+  port: 5432
+  db: geopipeline
+  user: geo
+  password: geo
