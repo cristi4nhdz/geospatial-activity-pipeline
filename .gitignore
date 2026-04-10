@@ -1,7 +1,5 @@
 settings.yaml
-config/__pycache__
-ingestion/__pycache__
 .vscode
 .mypy_cache
 logs/*.log
-ingestion/consumers/__pycache__
+__pycache__

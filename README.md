@@ -1,6 +1,6 @@
 # Geospatial Activity Pipeline
 
-A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, and stores areas of interest as polygons for downstream spatial querying.
+A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, stores areas of interest as polygons for downstream spatial querying, and archives processed Sentinel-2 satellite tiles to local S3-compatible object storage.
 
 ---
 
@@ -20,7 +20,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Processed Sentinel-2 satellite imagery tiles are archived to a local MinIO object store.
 
 ---
 
@@ -45,6 +45,7 @@ flowchart TD
 
     subgraph Storage["Storage"]
         PG["PostgreSQL/PostGIS\nvessel_tracks\naircraft_tracks\naoi"]
+        MN["MinIO\nsentinel-tiles"]
     end
 
     AIS -->|vessel pings| K1
@@ -63,7 +64,8 @@ flowchart TD
 | ------- | ------------ |
 | Language | Python 3.13 |
 | Messaging | Apache Kafka |
-| Geospatial DB | PostgreSQL + PostGIS |
+| Geospatial DB | PostgreSQL, PostGIS |
+| Object Storage | MinIO |
 | Orchestration | Docker Compose |
 | Environment | Conda |
 
@@ -71,14 +73,15 @@ flowchart TD
 
 ## Features
 
-- **2-Source Ingestion** — AISStream WebSocket and OpenSky Network REST API publishing live vessel and aircraft positions to Kafka
-- **AIS Normalization** — Handles Class A, Class B Standard, and Class B Extended position reports, normalizing MMSI, vessel name, coordinates, speed, heading, course, and navigational status
-- **ADS-B Normalization** — Filters airborne-only records and normalizes ICAO24, callsign, origin country, altitude, velocity, heading, and vertical rate
-- **Configurable AOI** — Bounding boxes per data source defined in YAML config, no hardcoded coordinates
-- **WebSocket Reconnection** — AIS producer automatically reconnects on connection drop
-- **PostGIS Spatial Schema** — Three tables with `GEOMETRY(Point/Polygon, 4326)` columns and GIST spatial indexes: `vessel_tracks`, `aircraft_tracks`, and `aoi`
-- **Consumer Lag Monitor** — Reports committed vs end offsets per consumer group and partition on a configurable interval
-- **Config-Driven** — YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, and API credentials
+- **2-Source Ingestion** - AISStream WebSocket and OpenSky Network REST API publishing live vessel and aircraft positions to Kafka
+- **AIS Normalization** - Handles Class A, Class B Standard, and Class B Extended position reports, normalizing MMSI, vessel name, coordinates, speed, heading, course, and navigational status
+- **ADS-B Normalization** - Filters airborne-only records and normalizes ICAO24, callsign, origin country, altitude, velocity, heading, and vertical rate
+- **Configurable AOI** - Bounding boxes per data source defined in YAML config, no hardcoded coordinates
+- **WebSocket Reconnection** - AIS producer automatically reconnects on connection drop
+- **PostGIS Spatial Schema** - Three tables with `GEOMETRY(Point/Polygon, 4326)` columns and GIST spatial indexes: `vessel_tracks`, `aircraft_tracks`, and `aoi`
+- **Consumer Lag Monitor** - Reports committed vs end offsets per consumer group and partition on a configurable interval
+- **MinIO Object Storage** - Local S3-compatible bucket for archiving processed Sentinel-2 satellite tiles
+- **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, and API credentials
 
 ---
 
@@ -127,6 +130,12 @@ conda activate geo-pipeline
 docker compose -f docker/docker-compose.yaml up -d
 ```
 
+**5. Create MinIO bucket:**
+
+```bash
+python -m imagery.minio_setup
+```
+
 ### Running the Pipeline
 
 ```bash
@@ -165,6 +174,9 @@ geospatial-activity-pipeline/
 |       |-- vessel_consumer.py
 |       |-- aircraft_consumer.py
 |       |-- lag_monitor.py
+|-- imagery/
+|   |-- __init__.py
+|   |-- minio_setup.py
 |-- db/
 │   |-- schema.sql
 │   |-- queries/
