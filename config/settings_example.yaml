@@ -31,3 +31,9 @@ postgis:
   db: geopipeline
   user: geo
   password: geo
+
+minio:
+  endpoint: localhost:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  bucket: sentinel-tiles
