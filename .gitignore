@@ -3,3 +3,6 @@ settings.yaml
 .mypy_cache
 logs/*.log
 __pycache__
+*.safe
+*.tif
+*.zip
