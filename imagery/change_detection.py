@@ -8,14 +8,14 @@ the change exceeds the configured threshold.
 """
 import os
 import sys
-
-os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
-os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
 import logging
 from pathlib import Path
 import numpy as np
-import rasterio
 from minio import Minio
+
+os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
+os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
+import rasterio
 from config.config_loader import config
 from config.logging_config import setup_logging
 

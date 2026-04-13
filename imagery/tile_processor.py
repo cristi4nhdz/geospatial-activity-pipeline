@@ -11,6 +11,7 @@ import sys
 import logging
 import zipfile
 from pathlib import Path
+
 # set GDAL env vars before rasterio loads, required for JP2 support on Windows
 os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
 os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
