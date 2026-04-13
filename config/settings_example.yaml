@@ -37,3 +37,19 @@ minio:
   access_key: minioadmin
   secret_key: minioadmin
   bucket: sentinel-tiles
+
+copernicus:
+  username: "YOUR_COPERNICUS_EMAIL_HERE"
+  password: "YOUR_COPERNICUS_PASSWORD_HERE"
+  client_id: "YOUR_COPERNICUS_CLIENT_ID_HERE"
+  client_secret: "YOUR_COPERNICUS_CLIENT_SECRET_HERE"
+  token_url: "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+  search_url: "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+
+aoi:
+  name: singapore_strait
+  bbox:
+    min_lat: 1.0
+    max_lat: 1.6
+    min_lon: 103.5
+    max_lon: 104.5

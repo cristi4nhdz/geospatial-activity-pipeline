@@ -6,6 +6,9 @@ channels:
   - defaults
 dependencies:
   - python
+  - gdal
+  - rasterio
+  - libgdal-jp2openjpeg
   - pip
   - pip:
       - kafka-python
@@ -18,3 +21,4 @@ dependencies:
       - pytest
       - pyyaml
       - minio
+      - shapely
