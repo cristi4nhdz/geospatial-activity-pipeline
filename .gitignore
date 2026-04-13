@@ -6,3 +6,5 @@ __pycache__
 *.safe
 *.tif
 *.zip
+*.json
+*.pt

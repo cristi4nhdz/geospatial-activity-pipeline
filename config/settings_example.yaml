@@ -53,3 +53,8 @@ aoi:
     max_lat: 1.6
     min_lon: 103.5
     max_lon: 104.5
+
+change_detection:
+  ndvi_threshold: 0.15
+  nir_threshold: 0.20
+  patch_size: 512

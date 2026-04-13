@@ -9,6 +9,8 @@ dependencies:
   - gdal
   - rasterio
   - libgdal-jp2openjpeg
+  - pytorch
+  - torchvision
   - pip
   - pip:
       - kafka-python
