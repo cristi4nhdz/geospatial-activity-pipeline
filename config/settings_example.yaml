@@ -58,3 +58,6 @@ change_detection:
   ndvi_threshold: 0.15
   nir_threshold: 0.20
   patch_size: 512
+
+airflow:
+  base_url: "http://localhost:8080"

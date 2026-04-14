@@ -1,6 +1,6 @@
 # Geospatial Activity Pipeline
 
-A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, and archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage.
+A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage, runs NDVI band-difference change detection with PyTorch CNN anomaly scoring, and orchestrates all pipelines with Apache Airflow DAGs.
 
 ---
 
@@ -20,7 +20,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are saved for downstream Snowflake loading. Three Airflow DAGs orchestrate the full pipeline.
 
 ---
 
@@ -50,9 +50,22 @@ flowchart TD
         U["tile_uploader.py"]
     end
 
+    subgraph Detection["Change Detection"]
+        CD["change_detection.py"]
+        PC["patch_classifier.py"]
+        AS["anomaly_scorer.py"]
+    end
+
+    subgraph Orchestration["Airflow DAGs"]
+        D1["track_ingestion_dag"]
+        D2["imagery_pipeline_dag"]
+        D3["anomaly_loader_dag"]
+    end
+
     subgraph Storage["Storage"]
         PG["PostgreSQL/PostGIS\nvessel_tracks\naircraft_tracks\naoi"]
         MN["MinIO\nsentinel-tiles"]
+        EV["imagery/events\nanomaly JSON"]
     end
 
     AIS -->|vessel pings| K1
@@ -65,6 +78,14 @@ flowchart TD
     F -->|zip| P
     P -->|COG| U
     U -->|upload| MN
+    MN -->|tiles| CD
+    CD -->|delta patches| PC
+    PC -->|CNN scores| AS
+    AS -->|events| EV
+    D1 -.->|schedules| C1
+    D1 -.->|schedules| C2
+    D2 -.->|schedules| F
+    D3 -.->|schedules| EV
 ```
 
 ---
@@ -78,7 +99,8 @@ flowchart TD
 | Geospatial DB | PostgreSQL, PostGIS |
 | Object Storage | MinIO |
 | Imagery | GDAL, Rasterio |
-| Orchestration | Docker Compose |
+| ML | PyTorch (CPU) |
+| Orchestration | Docker Compose, Apache Airflow |
 | Environment | Conda |
 
 ---
@@ -96,7 +118,11 @@ flowchart TD
 - **Sentinel-2 Fetch** - Authenticates with Copernicus Dataspace, searches for available L2A tiles over the configured AOI, and downloads the most recent tile
 - **Tile Processing** - Extracts B04 and B08 spectral bands, reprojects to WGS84, clips to AOI bounding box, and saves as Cloud-Optimized GeoTIFF using GDAL and Rasterio
 - **MinIO Object Storage** - Processed COG tiles uploaded to local S3-compatible bucket organized by date
-- **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, Copernicus credentials, and AOI definition
+- **NDVI Change Detection** - Computes NDVI delta between two tile dates and flags 512x512 patches where mean delta exceeds the configured threshold
+- **PyTorch Patch Classifier** - Lightweight binary CNN trained on real NDVI delta patches, scoring each anomaly patch with a probability between 0 and 1
+- **Anomaly Scorer** - Combines NDVI delta score and CNN confidence into a single ranked confidence score per patch, saving events to JSON for Snowflake loading
+- **Airflow Orchestration** - Three DAGs orchestrating track ingestion hourly, imagery pipeline weekly, and anomaly loading daily with retries and dependency ordering
+- **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, Copernicus credentials, AOI definition, and change detection thresholds
 
 ---
 
@@ -178,6 +204,15 @@ python -m imagery.tile_processor
 
 # Tile uploader
 python -m imagery.tile_uploader
+
+# Change detection
+python -m imagery.change_detection
+
+# Train patch classifier
+python -m imagery.patch_classifier
+
+# Score anomalies
+python -m imagery.anomaly_scorer
 ```
 
 ---
@@ -190,6 +225,11 @@ geospatial-activity-pipeline/
 │   |-- docker-compose.yaml
 │   |-- postgres/
 │       |-- init.sql
+|-- dags/
+|   |-- __init__.py
+|   |-- imagery_pipeline_dag.py
+|   |-- track_ingestion_dag.py
+|   |-- anomaly_loader_dag.py
 |-- ingestion/
 │   |-- __init__.py
 │   |-- ais_producer.py
@@ -205,6 +245,13 @@ geospatial-activity-pipeline/
 |   |-- sentinel_fetch.py
 |   |-- tile_processor.py
 |   |-- tile_uploader.py
+|   |-- change_detection.py
+|   |-- patch_classifier.py
+|   |-- anomaly_scorer.py
+|   |-- weights/
+|   |-- events/
+|   |-- downloads/
+|   |-- processed/
 |-- db/
 │   |-- schema.sql
 │   |-- queries/
