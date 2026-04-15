@@ -24,3 +24,4 @@ dependencies:
       - pyyaml
       - minio
       - shapely
+      - snowflake-connector-python
