@@ -61,3 +61,11 @@ change_detection:
 
 airflow:
   base_url: "http://localhost:8080"
+
+snowflake:
+  account: "YOUR_SNOWFLAKE_ACCOUNT_HERE"
+  user: "YOUR_SNOWFLAKE_USER_HERE"
+  password: "YOUR_SNOWFLAKE_PASSWORD_HERE"
+  database: "GEO_PIPELINE"
+  schema: "PUBLIC"
+  warehouse: "YOUR_SNOWFLAKE_WAREHOUSE_HERE"
