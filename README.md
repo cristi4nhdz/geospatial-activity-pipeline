@@ -20,7 +20,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline, track ingestion, imagery processing, and anomaly loading, with retries, dependency ordering, and a web UI at localhost:8080.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline, track ingestion, imagery processing, and anomaly loading, with retries, dependency ordering, and a web UI at localhost:8080. The pipeline is covered by 133 pytest tests at 83% coverage.
 
 ---
 
@@ -102,6 +102,8 @@ flowchart TD
 | ML | PyTorch (CPU) |
 | Warehouse | Snowflake |
 | Orchestration | Docker Compose, Apache Airflow |
+| Infrastructure | Docker Compose |
+| Testing | pytest, 83% coverage |
 | Environment | Conda |
 
 ---
@@ -124,6 +126,7 @@ flowchart TD
 - **Anomaly Scorer** - Combines NDVI delta score and CNN confidence into a single ranked confidence score per patch
 - **Snowflake Loader** - Loads scored anomaly events into Snowflake GEO_PIPELINE.PUBLIC.anomaly_events with duplicate detection and timestamp tracking
 - **Airflow Orchestration** - Three DAGs orchestrating track ingestion hourly, imagery pipeline weekly, and anomaly loading daily with retries and dependency ordering
+- **pytest Suite** - 133 tests at 83% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
 - **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, Copernicus credentials, Snowflake credentials, AOI definition, and change detection thresholds
 
 ---
@@ -229,6 +232,26 @@ python -m snowflake_loader.anomaly_loader
 
 ---
 
+### Test Coverage
+
+| Module | Statements | Coverage |
+| --- | --- | --- |
+| `ingestion/ais_producer.py` | 51 | 57% |
+| `ingestion/adsb_producer.py` | 62 | 95% |
+| `ingestion/consumers/vessel_consumer.py` | 40 | 80% |
+| `ingestion/consumers/aircraft_consumer.py` | 40 | 88% |
+| `ingestion/consumers/lag_monitor.py` | 43 | 95% |
+| `imagery/minio_setup.py` | 24 | 100% |
+| `imagery/tile_uploader.py` | 41 | 80% |
+| `imagery/change_detection.py` | 76 | 78% |
+| `imagery/patch_classifier.py` | 101 | 79% |
+| `imagery/anomaly_scorer.py` | 67 | 81% |
+| `snowflake_loader/setup.py` | 24 | 100% |
+| `snowflake_loader/anomaly_loader.py` | 46 | 100% |
+| **Total** | **615** | **83%** |
+
+---
+
 ## Project Structure
 
 ```text
@@ -268,6 +291,16 @@ geospatial-activity-pipeline/
 |   |-- __init__.py
 |   |-- setup.py
 |   |-- anomaly_loader.py
+|-- tests/
+|   |-- __init__.py
+|   |-- conftest.py
+|   |-- test_ingestion.py
+|   |-- test_spatial.py
+|   |-- test_dags.py
+|   |-- test_imagery.py
+|   |-- test_consumers.py
+|   |-- test_minio.py
+|   |-- test_snowflake.py
 |-- db/
 │   |-- schema.sql
 │   |-- queries/
@@ -277,6 +310,7 @@ geospatial-activity-pipeline/
 │   |-- config_loader.py
 │   |-- logging_config.py
 |-- logs/
+|-- .coveragerc
 |-- environment.yaml
 |-- README.md
 ```
