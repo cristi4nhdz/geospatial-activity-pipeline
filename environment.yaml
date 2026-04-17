@@ -25,3 +25,4 @@ dependencies:
       - minio
       - shapely
       - snowflake-connector-python
+      - pytest-cov
