@@ -26,3 +26,6 @@ dependencies:
       - shapely
       - snowflake-connector-python
       - pytest-cov
+      - pydeck
+      - streamlit
+      - pandas
