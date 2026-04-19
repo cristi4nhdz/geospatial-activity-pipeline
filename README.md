@@ -1,6 +1,6 @@
 # Geospatial Activity Pipeline
 
-A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage, runs NDVI band-difference change detection with PyTorch CNN anomaly scoring, orchestrates all pipelines with Apache Airflow DAGs, and loads scored anomaly events into Snowflake for warehousing and querying.
+A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage, runs NDVI band-difference change detection with PyTorch CNN anomaly scoring, orchestrates all pipelines with Apache Airflow DAGs, loads scored anomaly events into Snowflake for warehousing and querying, and displays fused intelligence through a 4-tab Streamlit dashboard with live tracking, land-change detection, and correlated event analysis.
 
 ---
 
@@ -8,6 +8,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Screenshots](#screenshots)
 - [Tech Stack](#tech-stack)
 - [Features](#features)
 - [Getting Started](#getting-started)
@@ -20,7 +21,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline, track ingestion, imagery processing, and anomaly loading, with retries, dependency ordering, and a web UI at localhost:8080. The pipeline is covered by 133 pytest tests at 83% coverage.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline with retries and dependency ordering. A 4-tab Streamlit dashboard fuses live vessel and aircraft tracking with Sentinel-2 land-change detection and anomaly correlation into a single intelligence workspace. The pipeline is covered by 133 pytest tests at 83% coverage.
 
 ---
 
@@ -68,6 +69,13 @@ flowchart TD
         SF["Snowflake\nGEO_PIPELINE.PUBLIC\nanomaly_events"]
     end
 
+    subgraph Dashboard["Streamlit Dashboard"]
+        DB1["Mission Overview"]
+        DB2["Live Tracking"]
+        DB3["Land Change Detection"]
+        DB4["Correlated Events"]
+    end
+
     AIS -->|vessel pings| K1
     OpenSky -->|aircraft states| K2
     K1 -->|consume| C1
@@ -86,7 +94,42 @@ flowchart TD
     D1 -.->|schedules| C2
     D2 -.->|schedules| F
     D3 -.->|schedules| SF
+    PG -->|tracks| DB2
+    SF -->|anomalies| DB3
+    PG & SF -->|fused| DB4
 ```
+
+---
+
+## Screenshots
+
+### Mission Overview
+
+![Mission Overview](docs/mission_overview.png)
+
+### Live Tracking
+
+![Live Tracking](docs/live_tracking.png)
+
+### Land Change Detection
+
+![Land Change Detection](docs/land_change_detection.png)
+
+### Sentinel Scene Preview
+
+![Sentinel Preview](docs/sentinel_preview.png)
+
+### Anomaly Patch Crop
+
+![Patch Crop](docs/patch_crop.png)
+
+### Correlated Events
+
+![Correlated Events](docs/correlated_events.png)
+
+### Analyst Assessment
+
+![Analyst Assessment](docs/analyst_assessment.png)
 
 ---
 
@@ -101,6 +144,7 @@ flowchart TD
 | Imagery | GDAL, Rasterio |
 | ML | PyTorch (CPU) |
 | Warehouse | Snowflake |
+| Dashboard | Streamlit, pydeck |
 | Orchestration | Docker Compose, Apache Airflow |
 | Infrastructure | Docker Compose |
 | Testing | pytest, 83% coverage |
@@ -126,6 +170,9 @@ flowchart TD
 - **Anomaly Scorer** - Combines NDVI delta score and CNN confidence into a single ranked confidence score per patch
 - **Snowflake Loader** - Loads scored anomaly events into Snowflake GEO_PIPELINE.PUBLIC.anomaly_events with duplicate detection and timestamp tracking
 - **Airflow Orchestration** - Three DAGs orchestrating track ingestion hourly, imagery pipeline weekly, and anomaly loading daily with retries and dependency ordering
+- **4-Tab Streamlit Dashboard** - Mission overview with KPI cards and AOI summary, live vessel and aircraft tracking with loitering detection and speed colour encoding, Sentinel-2 before/after scene previews with patch bounding box and quality diagnostic chips, and correlated event analysis with priority-ranked anomaly list and template-based analyst narrative
+- **Fused Intelligence** - Correlates satellite-detected land-surface change with nearby vessel and aircraft movement in space and time, assigning URGENT/HIGH/MEDIUM/LOW priority by combined confidence score and nearby asset count
+- **Loitering Detection** - Identifies vessels with ≥8 pings, avg speed ≤5kn, operating within a 1.5km radius over ≥45 minutes
 - **pytest Suite** - 133 tests at 83% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
 - **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, Copernicus credentials, Snowflake credentials, AOI definition, and change detection thresholds
 
@@ -228,6 +275,9 @@ python -m imagery.anomaly_scorer
 
 # Load anomaly events to Snowflake
 python -m snowflake_loader.anomaly_loader
+
+# Intelligence dashboard
+python -m streamlit run dashboard/app.py
 ```
 
 ---
@@ -291,6 +341,16 @@ geospatial-activity-pipeline/
 |   |-- __init__.py
 |   |-- setup.py
 |   |-- anomaly_loader.py
+|-- dashboard/
+|   |-- __init__.py
+|   |-- app.py
+|   |-- components/
+|       |-- __init__.py
+|       |-- track_map.py
+|       |-- anomaly_feed.py
+|       |-- correlation.py
+|       |-- analyst_summary.py
+|       |-- kpi.py
 |-- tests/
 |   |-- __init__.py
 |   |-- conftest.py
@@ -309,6 +369,7 @@ geospatial-activity-pipeline/
 │   |-- settings_example.yaml
 │   |-- config_loader.py
 │   |-- logging_config.py
+|-- docs/
 |-- logs/
 |-- .coveragerc
 |-- environment.yaml
