@@ -1,0 +1,38 @@
+name: Tests
+on:
+  push:
+    branches: [ main, master, "ci/cd" ]
+  pull_request:
+    branches: [ main, master, "ci/cd" ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: '3.13'
+        environment-file: environment.yaml
+        activate-environment: geo-pipeline
+
+    - name: Setup config file
+      shell: bash -l {0}
+      run: |
+        cp config/settings_example.yaml config/settings.yaml
+
+    - name: Run tests with coverage
+      shell: bash -l {0}
+      run: |
+        conda activate geo-pipeline
+        pytest --cov --cov-report=xml --cov-report=term
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
