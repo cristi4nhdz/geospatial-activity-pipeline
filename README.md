@@ -23,7 +23,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline with retries and dependency ordering. A 4-tab Streamlit dashboard fuses live vessel and aircraft tracking with Sentinel-2 land-change detection and anomaly correlation into a single intelligence workspace. The pipeline is covered by 133 pytest tests at 83% coverage.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline with retries and dependency ordering. A 4-tab Streamlit dashboard fuses live vessel and aircraft tracking with Sentinel-2 land-change detection and anomaly correlation into a single intelligence workspace. The pipeline is covered by 133 pytest tests at 82% coverage.
 
 ---
 
@@ -169,7 +169,7 @@ flowchart TD
 - **4-Tab Streamlit Dashboard** - Mission overview with KPI cards and AOI summary, live vessel and aircraft tracking with loitering detection and speed colour encoding, Sentinel-2 before/after scene previews with patch bounding box and quality diagnostic chips, and correlated event analysis with priority-ranked anomaly list and template-based analyst narrative
 - **Fused Intelligence** - Correlates satellite-detected land-surface change with nearby vessel and aircraft movement in space and time, assigning URGENT/HIGH/MEDIUM/LOW priority by combined confidence score and nearby asset count
 - **Loitering Detection** - Identifies vessels with ≥8 pings, avg speed ≤5kn, operating within a 1.5km radius over ≥45 minutes
-- **pytest Suite** - 133 tests at 83% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
+- **pytest Suite** - 133 tests at 82% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
 
 ---
 
@@ -293,19 +293,19 @@ docker compose down
 
 | Module | Statements | Coverage |
 | --- | --- | --- |
-| `ingestion/ais_producer.py` | 51 | 57% |
-| `ingestion/adsb_producer.py` | 62 | 95% |
-| `ingestion/consumers/vessel_consumer.py` | 40 | 80% |
-| `ingestion/consumers/aircraft_consumer.py` | 40 | 88% |
-| `ingestion/consumers/lag_monitor.py` | 43 | 95% |
-| `imagery/minio_setup.py` | 24 | 100% |
-| `imagery/tile_uploader.py` | 41 | 80% |
-| `imagery/change_detection.py` | 76 | 78% |
-| `imagery/patch_classifier.py` | 101 | 79% |
-| `imagery/anomaly_scorer.py` | 67 | 81% |
-| `snowflake_loader/setup.py` | 24 | 100% |
-| `snowflake_loader/anomaly_loader.py` | 46 | 100% |
-| **Total** | **615** | **83%** |
+| `ingestion/ais_producer.py` | 53 | 43% |
+| `ingestion/adsb_producer.py` | 64 | 94% |
+| `ingestion/consumers/vessel_consumer.py` | 42 | 79% |
+| `ingestion/consumers/aircraft_consumer.py` | 42 | 86% |
+| `ingestion/consumers/lag_monitor.py` | 45 | 93% |
+| `imagery/minio_setup.py` | 26 | 96% |
+| `imagery/tile_uploader.py` | 43 | 79% |
+| `imagery/change_detection.py` | 78 | 77% |
+| `imagery/patch_classifier.py` | 103 | 79% |
+| `imagery/anomaly_scorer.py` | 69 | 80% |
+| `snowflake_loader/setup.py` | 26 | 96% |
+| `snowflake_loader/anomaly_loader.py` | 48 | 98% |
+| **Total** | **639** | **82%** |
 
 ---
 
