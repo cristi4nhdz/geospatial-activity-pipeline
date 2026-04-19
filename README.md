@@ -1,5 +1,7 @@
 # Geospatial Activity Pipeline
 
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+
 A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage, runs NDVI band-difference change detection with PyTorch CNN anomaly scoring, orchestrates all pipelines with Apache Airflow DAGs, loads scored anomaly events into Snowflake for warehousing and querying, and displays fused intelligence through a 4-tab Streamlit dashboard with live tracking, land-change detection, and correlated event analysis.
 
 ---
@@ -63,18 +65,16 @@ flowchart TD
         D3["anomaly_loader_dag"]
     end
 
-    subgraph Storage["Storage"]
-        PG["PostgreSQL/PostGIS\nvessel_tracks\naircraft_tracks\naoi"]
-        MN["MinIO\nsentinel-tiles"]
-        SF["Snowflake\nGEO_PIPELINE.PUBLIC\nanomaly_events"]
-    end
-
     subgraph Dashboard["Streamlit Dashboard"]
         DB1["Mission Overview"]
         DB2["Live Tracking"]
         DB3["Land Change Detection"]
         DB4["Correlated Events"]
     end
+
+    PG["PostgreSQL/PostGIS\nvessel_tracks · aircraft_tracks · aoi"]
+    MN["MinIO\nsentinel-tiles"]
+    SF["Snowflake\nGEO_PIPELINE.PUBLIC\nanomaly_events"]
 
     AIS -->|vessel pings| K1
     OpenSky -->|aircraft states| K2
@@ -93,7 +93,7 @@ flowchart TD
     D1 -.->|schedules| C1
     D1 -.->|schedules| C2
     D2 -.->|schedules| F
-    D3 -.->|schedules| SF
+    D3 -.->|schedules| AS
     PG -->|tracks| DB2
     SF -->|anomalies| DB3
     PG & SF -->|fused| DB4
@@ -142,13 +142,14 @@ flowchart TD
 | Geospatial DB | PostgreSQL, PostGIS |
 | Object Storage | MinIO |
 | Imagery | GDAL, Rasterio |
-| ML | PyTorch (CPU) |
+| ML | PyTorch |
 | Warehouse | Snowflake |
 | Dashboard | Streamlit, pydeck |
 | Orchestration | Docker Compose, Apache Airflow |
 | Infrastructure | Docker Compose |
-| Testing | pytest, 83% coverage |
+| Testing | pytest,  pytest-cov |
 | Environment | Conda |
+| Environment | flake8, pylint, black, mypy, yamllint |
 
 ---
 
@@ -157,14 +158,9 @@ flowchart TD
 - **2-Source Ingestion** - AISStream WebSocket and OpenSky Network REST API publishing live vessel and aircraft positions to Kafka
 - **AIS Normalization** - Handles Class A, Class B Standard, and Class B Extended position reports, normalizing MMSI, vessel name, coordinates, speed, heading, course, and navigational status
 - **ADS-B Normalization** - Filters airborne-only records and normalizes ICAO24, callsign, origin country, altitude, velocity, heading, and vertical rate
-- **Configurable AOI** - Bounding boxes per data source defined in YAML config, no hardcoded coordinates
-- **WebSocket Reconnection** - AIS producer automatically reconnects on connection drop
 - **PostGIS Spatial Schema** - Three tables with `GEOMETRY(Point/Polygon, 4326)` columns and GIST spatial indexes: `vessel_tracks`, `aircraft_tracks`, and `aoi`
-- **Consumer Lag Monitor** - Reports committed vs end offsets per consumer group and partition on a configurable interval
-- **Auto Schema Init** - PostGIS extension and spatial schema applied automatically on container first start via Docker initdb
 - **Sentinel-2 Fetch** - Authenticates with Copernicus Dataspace, searches for available L2A tiles over the configured AOI, and downloads the most recent tile
 - **Tile Processing** - Extracts B04 and B08 spectral bands, reprojects to WGS84, clips to AOI bounding box, and saves as Cloud-Optimized GeoTIFF using GDAL and Rasterio
-- **MinIO Object Storage** - Processed COG tiles uploaded to local S3-compatible bucket organized by date
 - **NDVI Change Detection** - Computes NDVI delta between two tile dates and flags 512x512 patches where mean delta exceeds the configured threshold
 - **PyTorch Patch Classifier** - Lightweight binary CNN trained on real NDVI delta patches, scoring each anomaly patch with a probability between 0 and 1
 - **Anomaly Scorer** - Combines NDVI delta score and CNN confidence into a single ranked confidence score per patch
@@ -174,7 +170,6 @@ flowchart TD
 - **Fused Intelligence** - Correlates satellite-detected land-surface change with nearby vessel and aircraft movement in space and time, assigning URGENT/HIGH/MEDIUM/LOW priority by combined confidence score and nearby asset count
 - **Loitering Detection** - Identifies vessels with ≥8 pings, avg speed ≤5kn, operating within a 1.5km radius over ≥45 minutes
 - **pytest Suite** - 133 tests at 83% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
-- **Config-Driven** - YAML-based configuration for Kafka topics, bounding boxes, PostGIS connection, MinIO credentials, Copernicus credentials, Snowflake credentials, AOI definition, and change detection thresholds
 
 ---
 
@@ -200,7 +195,6 @@ flowchart TD
 **1. Clone the repository:**
 
 ```bash
-# Clone the repo
 git clone https://github.com/cristi4nhdz/geospatial-activity-pipeline.git
 cd geospatial-activity-pipeline
 ```
@@ -219,19 +213,13 @@ conda env create -f environment.yaml
 conda activate geo-pipeline
 ```
 
-**4. Start the Docker stack:**
-
-```bash
-docker compose -f docker/docker-compose.yaml up -d
-```
-
-**5. Create MinIO bucket:**
+**4. Create MinIO bucket:**
 
 ```bash
 python -m imagery.minio_setup
 ```
 
-**6. Set up Snowflake:**
+**5. Set up Snowflake:**
 
 ```bash
 python -m snowflake_loader.setup
@@ -239,7 +227,14 @@ python -m snowflake_loader.setup
 
 ### Running the Pipeline
 
+**Start the full pipeline:**
+
 ```bash
+docker compose -f docker/docker-compose.yaml up -d
+```
+
+```bash
+
 # AIS vessel producer
 python -m ingestion.ais_producer
 
@@ -280,6 +275,18 @@ python -m snowflake_loader.anomaly_loader
 python -m streamlit run dashboard/app.py
 ```
 
+**Run tests:**
+
+```bash
+pytest
+```
+
+**Shut down:**
+
+```bash
+docker compose down
+```
+
 ---
 
 ### Test Coverage
@@ -306,72 +313,72 @@ python -m streamlit run dashboard/app.py
 
 ```text
 geospatial-activity-pipeline/
-|-- docker/
-│   |-- docker-compose.yaml
+|-- docker/                              # Docker Compose stack and Postgres init
+│   |-- docker-compose.yaml             # Kafka, Zookeeper, PostGIS, MinIO, Airflow services
 │   |-- postgres/
-│       |-- init.sql
-|-- dags/
+│       |-- init.sql                    # PostGIS extension and spatial schema on first start
+|-- dags/                               # Airflow DAG definitions
 |   |-- __init__.py
-|   |-- imagery_pipeline_dag.py
-|   |-- track_ingestion_dag.py
-|   |-- anomaly_loader_dag.py
-|-- ingestion/
+|   |-- imagery_pipeline_dag.py         # Weekly Sentinel fetch, tile processing, and upload
+|   |-- track_ingestion_dag.py          # Hourly vessel and aircraft consumer orchestration
+|   |-- anomaly_loader_dag.py           # Daily scored anomaly event loading to Snowflake
+|-- ingestion/                          # AIS and ADS-B data ingestion
 │   |-- __init__.py
-│   |-- ais_producer.py
-│   |-- adsb_producer.py
+│   |-- ais_producer.py                 # AISStream WebSocket producer publishing to ais.vessels
+│   |-- adsb_producer.py                # OpenSky REST producer publishing to adsb.aircraft
 |   |-- consumers/
 |       |-- __init__.py
-|       |-- vessel_consumer.py
-|       |-- aircraft_consumer.py
-|       |-- lag_monitor.py
-|-- imagery/
+|       |-- vessel_consumer.py          # Consumes ais.vessels and upserts to PostGIS
+|       |-- aircraft_consumer.py        # Consumes adsb.aircraft and inserts to PostGIS
+|       |-- lag_monitor.py              # Reports Kafka consumer group lag per partition
+|-- imagery/                            # Sentinel-2 imagery pipeline
 |   |-- __init__.py
-|   |-- minio_setup.py
-|   |-- sentinel_fetch.py
-|   |-- tile_processor.py
-|   |-- tile_uploader.py
-|   |-- change_detection.py
-|   |-- patch_classifier.py
-|   |-- anomaly_scorer.py
-|   |-- weights/
-|   |-- events/
-|   |-- downloads/
-|   |-- processed/
-|-- snowflake_loader/
+|   |-- minio_setup.py                  # Creates sentinel-tiles bucket in MinIO
+|   |-- sentinel_fetch.py               # Authenticates with Copernicus and downloads L2A tiles
+|   |-- tile_processor.py               # Extracts B04/B08 bands and saves as Cloud-Optimized GeoTIFF
+|   |-- tile_uploader.py                # Uploads processed COG tiles to MinIO
+|   |-- change_detection.py             # NDVI band-difference change detection between tile dates
+|   |-- patch_classifier.py             # PyTorch CNN scoring anomaly patches 0–1
+|   |-- anomaly_scorer.py               # Combines NDVI delta and CNN score into ranked confidence
+|   |-- weights/                        # Trained CNN model weights
+|   |-- events/                         # Scored anomaly event outputs
+|   |-- downloads/                      # Raw downloaded Sentinel tile zips
+|   |-- processed/                      # Processed Cloud-Optimized GeoTIFFs
+|-- snowflake_loader/                   # Snowflake schema and event loading
 |   |-- __init__.py
-|   |-- setup.py
-|   |-- anomaly_loader.py
-|-- dashboard/
+|   |-- setup.py                        # Creates GEO_PIPELINE.PUBLIC.anomaly_events table
+|   |-- anomaly_loader.py               # Loads scored anomaly events into Snowflake with deduplication
+|-- dashboard/                          # 4-tab Streamlit intelligence dashboard
 |   |-- __init__.py
-|   |-- app.py
+|   |-- app.py                          # Main dashboard entry point and tab layout
 |   |-- components/
 |       |-- __init__.py
-|       |-- track_map.py
-|       |-- anomaly_feed.py
-|       |-- correlation.py
-|       |-- analyst_summary.py
-|       |-- kpi.py
-|-- tests/
+|       |-- track_map.py                # PostGIS vessel/aircraft fetchers and loitering detection
+|       |-- anomaly_feed.py             # Snowflake anomaly event fetchers
+|       |-- correlation.py              # Haversine proximity, anomaly centering, priority assignment
+|       |-- analyst_summary.py          # Template-based intelligence narrative generator
+|       |-- kpi.py                      # KPI cards, AOI summary, and anomaly event cards
+|-- tests/                              # pytest test suite
 |   |-- __init__.py
-|   |-- conftest.py
-|   |-- test_ingestion.py
-|   |-- test_spatial.py
-|   |-- test_dags.py
-|   |-- test_imagery.py
-|   |-- test_consumers.py
-|   |-- test_minio.py
-|   |-- test_snowflake.py
+|   |-- conftest.py                     # Shared fixtures and test configuration
+|   |-- test_ingestion.py               # AIS and ADS-B normalization tests
+|   |-- test_spatial.py                 # PostGIS schema and spatial query tests
+|   |-- test_dags.py                    # Airflow DAG structure and dependency tests
+|   |-- test_imagery.py                 # Sentinel fetch, tile processing, and change detection tests
+|   |-- test_consumers.py               # Vessel and aircraft consumer tests
+|   |-- test_minio.py                   # MinIO bucket setup and upload tests
+|   |-- test_snowflake.py               # Snowflake loader and schema setup tests
 |-- db/
-│   |-- schema.sql
-│   |-- queries/
+│   |-- schema.sql                      # PostGIS table definitions and GIST index setup
+│   |-- queries/                        # Reusable spatial SQL queries
 |-- config/
 │   |-- __init__.py
-│   |-- settings_example.yaml
-│   |-- config_loader.py
-│   |-- logging_config.py
-|-- docs/
-|-- logs/
-|-- .coveragerc
-|-- environment.yaml
+│   |-- settings_example.yaml           # Template config with all required fields
+│   |-- config_loader.py                # Loads and validates settings.yaml at startup
+│   |-- logging_config.py               # Shared logging configuration
+|-- docs/                               # Screenshots for README
+|-- logs/                               # Runtime log output
+|-- .coveragerc                         # pytest coverage configuration
+|-- environment.yaml                    # Conda environment spec
 |-- README.md
 ```
