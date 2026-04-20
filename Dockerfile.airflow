@@ -1,0 +1,31 @@
+# Dockerfile.airflow
+FROM continuumio/miniconda3:latest
+
+USER root
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY environment.airflow.yaml .
+RUN conda env create -f environment.airflow.yaml && conda clean -afy
+
+# Force spawn mode to avoid fork/deadlock with conda
+RUN echo "import multiprocessing; multiprocessing.set_start_method('spawn', force=True)" > \
+    /opt/conda/envs/geo-pipeline/lib/python3.12/sitecustomize.py
+
+RUN mkdir -p /opt/airflow/logs/scheduler \
+             /opt/airflow/logs/dag_processor_manager \
+             /opt/airflow/dags \
+             /opt/airflow/plugins && \
+    useradd -ms /bin/bash -u 50000 airflow && \
+    chown -R airflow:airflow /opt/airflow
+
+USER airflow
+
+ENV PATH="/opt/conda/envs/geo-pipeline/bin:$PATH"
+ENV PYTHONPATH="/opt/airflow"
+ENV AIRFLOW_HOME="/opt/airflow"
