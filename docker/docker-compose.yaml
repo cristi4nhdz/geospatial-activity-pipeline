@@ -4,8 +4,6 @@ name: geospatial-pipeline
 
 services:
 
-  # ─────────────────────────── INFRASTRUCTURE ───────────────────────────
-
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     restart: on-failure
@@ -73,8 +71,6 @@ services:
       interval: 10s
       retries: 5
 
-  # ─────────────────────────── AIRFLOW ───────────────────────────
-
   airflow-db:
     image: postgres:16
     restart: on-failure
@@ -90,28 +86,34 @@ services:
       retries: 5
 
   airflow-init:
-    image: apache/airflow:2.9.0
-    depends_on:
-      airflow-db:
-        condition: service_healthy
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: ''
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
-      _AIRFLOW_DB_MIGRATE: 'true'
-      _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: 'admin'
-      _AIRFLOW_WWW_USER_PASSWORD: 'admin'
-    volumes:
-      - ../dags:/opt/airflow/dags
-      - airflow-logs:/opt/airflow/logs
-    command: version
-    restart: on-failure
+      build:
+        context: ..
+        dockerfile: Dockerfile.airflow
+      depends_on:
+        airflow-db:
+          condition: service_healthy
+      environment:
+        AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ''
+        AIRFLOW_HOME: /opt/airflow
+        AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+        AIRFLOW__CORE__EXECUTOR: LocalExecutor
+        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+        AIRFLOW__CORE__FERNET_KEY: ''
+        AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+        AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
+      volumes:
+        - ../dags:/opt/airflow/dags
+        - ../imagery:/opt/airflow/imagery
+        - ../config:/opt/airflow/config
+        - airflow-logs:/opt/airflow/logs
+      command: >
+        bash -c "/opt/conda/envs/geo-pipeline/bin/airflow db migrate && /opt/conda/envs/geo-pipeline/bin/airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+      restart: on-failure
 
   airflow-webserver:
-    image: apache/airflow:2.9.0
+    build:
+      context: ..
+      dockerfile: Dockerfile.airflow
     restart: on-failure
     depends_on:
       airflow-db:
@@ -121,6 +123,10 @@ services:
     ports:
       - "8080:8080"
     environment:
+      AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ''
+      AIRFLOW__CORE__MP_START_METHOD: 'spawn'
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ''
@@ -128,11 +134,15 @@ services:
       AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
     volumes:
       - ../dags:/opt/airflow/dags
+      - ../imagery:/opt/airflow/imagery
+      - ../config:/opt/airflow/config
       - airflow-logs:/opt/airflow/logs
-    command: webserver
+    command: ["/opt/conda/envs/geo-pipeline/bin/airflow", "webserver"]
 
   airflow-scheduler:
-    image: apache/airflow:2.9.0
+    build:
+      context: ..
+      dockerfile: Dockerfile.airflow
     restart: on-failure
     depends_on:
       airflow-db:
@@ -140,16 +150,20 @@ services:
       airflow-init:
         condition: service_completed_successfully
     environment:
+      AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ''
+      AIRFLOW__CORE__MP_START_METHOD: 'spawn'
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - ../dags:/opt/airflow/dags
+      - ../imagery:/opt/airflow/imagery
+      - ../config:/opt/airflow/config
       - airflow-logs:/opt/airflow/logs
-    command: scheduler
-
-  # ─────────────────────────── PIPELINE INIT ───────────────────────────
+    command: ["/opt/conda/envs/geo-pipeline/bin/airflow", "scheduler"]
 
   minio-init:
     build:
@@ -171,8 +185,6 @@ services:
       - ../config/settings.yaml:/app/config/settings.yaml
     command: ["python", "-m", "snowflake_loader.setup"]
     restart: on-failure
-
-  # ─────────────────────────── INGESTION ───────────────────────────
 
   ais-producer:
     build:
@@ -225,8 +237,6 @@ services:
       - ../config/settings.yaml:/app/config/settings.yaml
     command: ["python", "-m", "ingestion.consumers.aircraft_consumer"]
     restart: on-failure
-
-  # ─────────────────────────── DASHBOARD ───────────────────────────
 
   dashboard:
     build:
