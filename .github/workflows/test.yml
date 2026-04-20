@@ -1,9 +1,9 @@
 name: Tests
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, "ci/cd" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, "ci/cd" ]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,8 +24,7 @@ jobs:
           --health-retries 5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2
@@ -37,13 +36,16 @@ jobs:
 
     - name: Setup config file
       shell: bash -l {0}
+      run: cp config/settings_example.yaml config/settings.yaml
+
+    - name: Override postgis host for CI
+      shell: bash -l {0}
       run: |
-        cp config/settings_example.yaml config/settings.yaml
+        sed -i 's/host: postgres/host: localhost/' config/settings.yaml
 
     - name: Apply database schema
       shell: bash -l {0}
-      run: |
-        PGPASSWORD=geo psql -h localhost -U geo -d geopipeline -f db/schema.sql
+      run: PGPASSWORD=geo psql -h localhost -U geo -d geopipeline -f db/schema.sql
 
     - name: Run tests with coverage
       shell: bash -l {0}
