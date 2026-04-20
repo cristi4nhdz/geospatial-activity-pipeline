@@ -2,8 +2,7 @@
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://github.com/cristi4nhdz/geospatial-activity-pipeline/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cristi4nhdz/geospatial-activity-pipeline/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/cristi4nhdz/osint-threat-intel-pipeline/branch/main/graph/badge.svg)](https://codecov.io/gh/cristi4nhdz/osint-threat-intel-pipeline)
-
+[![codecov](https://codecov.io/gh/cristi4nhdz/geospatial-activity-pipeline/branch/main/graph/badge.svg)](https://codecov.io/gh/cristi4nhdz/geospatial-activity-pipeline)
 
 A real-time geospatial intelligence pipeline that ingests live vessel and aircraft positions from AISStream and OpenSky Network across 2 Kafka topics, normalizes and upserts spatial tracks into PostgreSQL/PostGIS with GIST-indexed geometry columns, fetches and processes Sentinel-2 satellite imagery for defined areas of interest, archives Cloud-Optimized GeoTIFF tiles to local S3-compatible object storage, runs NDVI band-difference change detection with PyTorch CNN anomaly scoring, orchestrates all pipelines with Apache Airflow DAGs, loads scored anomaly events into Snowflake for warehousing and querying, and displays fused intelligence through a 4-tab Streamlit dashboard with live tracking, land-change detection, and correlated event analysis.
 
@@ -150,9 +149,9 @@ flowchart TD
 | Dashboard | Streamlit, pydeck |
 | Orchestration | Docker Compose, Apache Airflow |
 | Infrastructure | Docker Compose |
-| Testing | pytest,  pytest-cov |
+| Testing | pytest, pytest-cov |
 | Environment | Conda |
-| Environment | flake8, pylint, black, mypy, yamllint |
+| Linting | flake8, pylint, black, mypy, yamllint |
 
 ---
 
@@ -209,74 +208,21 @@ cp config/settings_example.yaml config/settings.yaml
 # edit settings.yaml with your API keys and credentials
 ```
 
-**3. Create a local Conda environment:**
+**3. Start the full pipeline:**
 
 ```bash
-conda env create -f environment.yaml
-conda activate geo-pipeline
+docker compose -f docker/docker-compose.yaml up
 ```
 
-**4. Create MinIO bucket:**
-
-```bash
-python -m imagery.minio_setup
-```
-
-**5. Set up Snowflake:**
-
-```bash
-python -m snowflake_loader.setup
-```
+This starts all services automatically - Kafka, PostGIS, MinIO, Airflow, all producers, consumers, and the dashboard.
 
 ### Running the Pipeline
 
-**Start the full pipeline:**
-
-```bash
-docker compose -f docker/docker-compose.yaml up -d
-```
-
-```bash
-
-# AIS vessel producer
-python -m ingestion.ais_producer
-
-# ADS-B aircraft producer
-python -m ingestion.adsb_producer
-
-# Vessel consumer
-python -m ingestion.consumers.vessel_consumer
-
-# Aircraft consumer
-python -m ingestion.consumers.aircraft_consumer
-
-# Lag monitor
-python -m ingestion.consumers.lag_monitor
-
-# Sentinel-2 fetch
-python -m imagery.sentinel_fetch
-
-# Tile processor
-python -m imagery.tile_processor
-
-# Tile uploader
-python -m imagery.tile_uploader
-
-# Change detection
-python -m imagery.change_detection
-
-# Train patch classifier
-python -m imagery.patch_classifier
-
-# Score anomalies
-python -m imagery.anomaly_scorer
-
-# Load anomaly events to Snowflake
-python -m snowflake_loader.anomaly_loader
-
-# Intelligence dashboard
-python -m streamlit run dashboard/app.py
-```
+| Service | URL |
+| ------- | --- |
+| Intelligence Dashboard | http://localhost:8501 |
+| Airflow UI | http://localhost:8080 (admin / admin) |
+| MinIO Console | http://localhost:9001 (minioadmin / minioadmin) |
 
 **Run tests:**
 
@@ -287,7 +233,7 @@ pytest
 **Shut down:**
 
 ```bash
-docker compose down
+docker compose -f docker/docker-compose.yaml down
 ```
 
 ---
@@ -316,8 +262,11 @@ docker compose down
 
 ```text
 geospatial-activity-pipeline/
+|-- .github/
+|   |-- workflows/
+|       |-- test.yml                    # GitHub Actions CI — runs 133 tests with Codecov on every push
 |-- docker/                              # Docker Compose stack and Postgres init
-│   |-- docker-compose.yaml             # Kafka, Zookeeper, PostGIS, MinIO, Airflow services
+│   |-- docker-compose.yaml             # Full pipeline stack - Kafka, PostGIS, MinIO, Airflow, all services
 │   |-- postgres/
 │       |-- init.sql                    # PostGIS extension and spatial schema on first start
 |-- dags/                               # Airflow DAG definitions
@@ -381,7 +330,8 @@ geospatial-activity-pipeline/
 │   |-- logging_config.py               # Shared logging configuration
 |-- docs/                               # Screenshots for README
 |-- logs/                               # Runtime log output
-|-- .coveragerc                         # pytest coverage configuration
+|-- Dockerfile                          # Single image for all pipeline services
 |-- environment.yaml                    # Conda environment spec
+|-- pytest.ini                          # pytest config with coverage settings for all pipeline modules
 |-- README.md
 ```

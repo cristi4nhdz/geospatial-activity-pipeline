@@ -26,14 +26,14 @@ opensky:
     max_lon: 104.5
 
 postgis:
-  host: localhost
+  host: postgres
   port: 5432
   db: geopipeline
   user: geo
   password: geo
 
 minio:
-  endpoint: localhost:9000
+  endpoint: minio:9000
   access_key: minioadmin
   secret_key: minioadmin
   bucket: sentinel-tiles
@@ -45,6 +45,7 @@ copernicus:
   client_secret: "YOUR_COPERNICUS_CLIENT_SECRET_HERE"
   token_url: "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
   search_url: "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+  download_url: "https://zipper.dataspace.copernicus.eu/api/v1/dataspace/custom-scripts/sentinel-2"
 
 aoi:
   name: singapore_strait
