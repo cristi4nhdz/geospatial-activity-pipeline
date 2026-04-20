@@ -40,6 +40,11 @@ jobs:
       run: |
         cp config/settings_example.yaml config/settings.yaml
 
+    - name: Apply database schema
+      shell: bash -l {0}
+      run: |
+        PGPASSWORD=geo psql -h localhost -U geo -d geopipeline -f docker/postgres/init.sql
+
     - name: Run tests with coverage
       shell: bash -l {0}
       run: |
