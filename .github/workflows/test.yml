@@ -43,7 +43,7 @@ jobs:
     - name: Apply database schema
       shell: bash -l {0}
       run: |
-        PGPASSWORD=geo psql -h localhost -U geo -d geopipeline -f docker/postgres/init.sql
+        PGPASSWORD=geo psql -h localhost -U geo -d geopipeline -f db/schema.sql
 
     - name: Run tests with coverage
       shell: bash -l {0}
