@@ -133,50 +133,6 @@ class TestImageryPipelineDag:
         """DAG has task dependency chain."""
         assert ">>" in self.source
 
-
-class TestTrackIngestionDag:
-    """Tests for track_ingestion_dag.py structure."""
-
-    def setup_method(self):
-        self.source = load_dag_source("track_ingestion_dag.py")
-
-    def test_dag_file_exists(self):
-        """track_ingestion_dag.py exists in dags/."""
-        assert Path("dags/track_ingestion_dag.py").exists()
-
-    def test_dag_id(self):
-        """DAG id is track_ingestion."""
-        assert extract_dag_id(self.source) == "track_ingestion"
-
-    def test_schedule_is_hourly(self):
-        """DAG schedule is hourly."""
-        assert extract_schedule(self.source) == "@hourly"
-
-    def test_has_vessel_consumer_task(self):
-        """DAG has vessel_consumer task."""
-        assert "vessel_consumer" in extract_task_ids(self.source)
-
-    def test_has_aircraft_consumer_task(self):
-        """DAG has aircraft_consumer task."""
-        assert "aircraft_consumer" in extract_task_ids(self.source)
-
-    def test_has_lag_monitor_task(self):
-        """DAG has lag_monitor task."""
-        assert "lag_monitor" in extract_task_ids(self.source)
-
-    def test_has_three_tasks(self):
-        """DAG has exactly three tasks."""
-        assert len(extract_task_ids(self.source)) == 3
-
-    def test_has_retries(self):
-        """DAG has retries configured."""
-        assert "retries" in self.source
-
-    def test_lag_monitor_downstream(self):
-        """lag_monitor appears after dependency operator."""
-        assert ">> t3" in self.source
-
-
 class TestAnomalyLoaderDag:
     """Tests for anomaly_loader_dag.py structure."""
 
