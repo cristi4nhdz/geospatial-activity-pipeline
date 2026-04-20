@@ -3,8 +3,12 @@
 name: geospatial-pipeline
 
 services:
+
+  # ─────────────────────────── INFRASTRUCTURE ───────────────────────────
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
+    restart: on-failure
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     volumes:
@@ -27,6 +31,12 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   postgres:
     image: postgis/postgis:16-3.4
@@ -63,6 +73,8 @@ services:
       interval: 10s
       retries: 5
 
+  # ─────────────────────────── AIRFLOW ───────────────────────────
+
   airflow-db:
     image: postgres:16
     restart: on-failure
@@ -77,14 +89,11 @@ services:
       interval: 5s
       retries: 5
 
-  airflow-webserver:
+  airflow-init:
     image: apache/airflow:2.9.0
-    restart: on-failure
     depends_on:
       airflow-db:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
@@ -98,6 +107,28 @@ services:
     volumes:
       - ../dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
+    command: version
+    restart: on-failure
+
+  airflow-webserver:
+    image: apache/airflow:2.9.0
+    restart: on-failure
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
     command: webserver
 
   airflow-scheduler:
@@ -106,6 +137,8 @@ services:
     depends_on:
       airflow-db:
         condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
@@ -115,6 +148,99 @@ services:
       - ../dags:/opt/airflow/dags
       - airflow-logs:/opt/airflow/logs
     command: scheduler
+
+  # ─────────────────────────── PIPELINE INIT ───────────────────────────
+
+  minio-init:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "imagery.minio_setup"]
+    restart: on-failure
+
+  snowflake-setup:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "snowflake_loader.setup"]
+    restart: on-failure
+
+  # ─────────────────────────── INGESTION ───────────────────────────
+
+  ais-producer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "ingestion.ais_producer"]
+    restart: on-failure
+
+  adsb-producer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "ingestion.adsb_producer"]
+    restart: on-failure
+
+  vessel-consumer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "ingestion.consumers.vessel_consumer"]
+    restart: on-failure
+
+  aircraft-consumer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["python", "-m", "ingestion.consumers.aircraft_consumer"]
+    restart: on-failure
+
+  # ─────────────────────────── DASHBOARD ───────────────────────────
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../config/settings.yaml:/app/config/settings.yaml
+    command: ["streamlit", "run", "dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    restart: on-failure
 
 volumes:
   zk-data:
