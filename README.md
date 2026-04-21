@@ -1,6 +1,6 @@
 # Geospatial Activity Pipeline
 
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://github.com/cristi4nhdz/geospatial-activity-pipeline/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cristi4nhdz/geospatial-activity-pipeline/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/cristi4nhdz/geospatial-activity-pipeline/branch/main/graph/badge.svg)](https://codecov.io/gh/cristi4nhdz/geospatial-activity-pipeline)
 
@@ -25,7 +25,7 @@ A real-time geospatial intelligence pipeline that ingests live vessel and aircra
 
 ## Overview
 
-Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Three Airflow DAGs orchestrate the full pipeline with retries and dependency ordering. A 4-tab Streamlit dashboard fuses live vessel and aircraft tracking with Sentinel-2 land-change detection and anomaly correlation into a single intelligence workspace. The pipeline is covered by 133 pytest tests at 82% coverage.
+Pulls live AIS vessel positions via AISStream WebSocket and ADS-B aircraft transponder data via OpenSky Network REST API. Normalizes raw Class A, B, and Extended position reports and aircraft state vectors, publishes them to Kafka topics, and upserts tracks into a PostGIS spatial database with GIST-indexed geometry columns for fast spatial queries. Sentinel-2 satellite tiles are fetched from Copernicus Dataspace, processed with GDAL and Rasterio into Cloud-Optimized GeoTIFFs, and archived to a local MinIO object store. NDVI band-difference change detection flags anomaly patches between tile dates, a lightweight PyTorch CNN scores each patch, and combined confidence-ranked anomaly events are loaded into Snowflake for warehousing. Two Airflow DAGs orchestrate the full pipeline with retries and dependency ordering. A 4-tab Streamlit dashboard fuses live vessel and aircraft tracking with Sentinel-2 land-change detection and anomaly correlation into a single intelligence workspace. The pipeline is covered by 124 pytest tests at 82% coverage.
 
 ---
 
@@ -49,22 +49,18 @@ flowchart TD
         C2["aircraft_consumer.py"]
     end
 
-    subgraph Imagery["Imagery Pipeline"]
+    subgraph Imagery["Imagery Pipeline (Airflow DAG)"]
         F["sentinel_fetch.py"]
         P["tile_processor.py"]
         U["tile_uploader.py"]
-    end
-
-    subgraph Detection["Change Detection"]
         CD["change_detection.py"]
         PC["patch_classifier.py"]
         AS["anomaly_scorer.py"]
     end
 
     subgraph Orchestration["Airflow DAGs"]
-        D1["track_ingestion_dag"]
-        D2["imagery_pipeline_dag"]
-        D3["anomaly_loader_dag"]
+        D2["imagery_pipeline_dag\n(weekly)"]
+        D3["anomaly_loader_dag\n(daily)"]
     end
 
     subgraph Dashboard["Streamlit Dashboard"]
@@ -85,16 +81,11 @@ flowchart TD
     C1 -->|upsert| PG
     C2 -->|insert| PG
     Copernicus -->|download tile| F
-    F -->|zip| P
-    P -->|COG| U
-    U -->|upload| MN
+    F --> P --> U --> MN
     MN -->|tiles| CD
-    CD -->|delta patches| PC
-    PC -->|CNN scores| AS
-    AS -->|events| SF
-    D1 -.->|schedules| C1
-    D1 -.->|schedules| C2
-    D2 -.->|schedules| F
+    CD --> PC --> AS
+    AS -->|events JSON| SF
+    D2 -.->|orchestrates| F
     D3 -.->|schedules| AS
     PG -->|tracks| DB2
     SF -->|anomalies| DB3
@@ -139,7 +130,7 @@ flowchart TD
 
 | Layer | Technology |
 | ------- | ------------ |
-| Language | Python 3.13 |
+| Language | Python 3.12 |
 | Messaging | Apache Kafka |
 | Geospatial DB | PostgreSQL, PostGIS |
 | Object Storage | MinIO |
@@ -164,14 +155,15 @@ flowchart TD
 - **Sentinel-2 Fetch** - Authenticates with Copernicus Dataspace, searches for available L2A tiles over the configured AOI, and downloads the most recent tile
 - **Tile Processing** - Extracts B04 and B08 spectral bands, reprojects to WGS84, clips to AOI bounding box, and saves as Cloud-Optimized GeoTIFF using GDAL and Rasterio
 - **NDVI Change Detection** - Computes NDVI delta between two tile dates and flags 512x512 patches where mean delta exceeds the configured threshold
-- **PyTorch Patch Classifier** - Lightweight binary CNN trained on real NDVI delta patches, scoring each anomaly patch with a probability between 0 and 1
+- **PyTorch Patch Classifier** - Lightweight binary CNN trained on real NDVI delta patches, scoring each anomaly patch with a probability between 0 and 1. Pre-trained weights included
 - **Anomaly Scorer** - Combines NDVI delta score and CNN confidence into a single ranked confidence score per patch
-- **Snowflake Loader** - Loads scored anomaly events into Snowflake GEO_PIPELINE.PUBLIC.anomaly_events with duplicate detection and timestamp tracking
-- **Airflow Orchestration** - Three DAGs orchestrating track ingestion hourly, imagery pipeline weekly, and anomaly loading daily with retries and dependency ordering
+- **Snowflake Loader** - Loads scored anomaly events into Snowflake `GEO_PIPELINE.PUBLIC.anomaly_events` with duplicate detection and timestamp tracking
+- **Airflow Orchestration** - Two DAGs: `imagery_pipeline` runs weekly (fetch -> process -> upload -> change detection -> score anomalies) and `anomaly_loader` runs daily, both with retries and dependency ordering
+- **Fully Containerized** - All ingestion services, Airflow, MinIO, PostGIS, Kafka, and the dashboard run via a single `docker compose up`
 - **4-Tab Streamlit Dashboard** - Mission overview with KPI cards and AOI summary, live vessel and aircraft tracking with loitering detection and speed colour encoding, Sentinel-2 before/after scene previews with patch bounding box and quality diagnostic chips, and correlated event analysis with priority-ranked anomaly list and template-based analyst narrative
 - **Fused Intelligence** - Correlates satellite-detected land-surface change with nearby vessel and aircraft movement in space and time, assigning URGENT/HIGH/MEDIUM/LOW priority by combined confidence score and nearby asset count
 - **Loitering Detection** - Identifies vessels with ≥8 pings, avg speed ≤5kn, operating within a 1.5km radius over ≥45 minutes
-- **pytest Suite** - 133 tests at 82% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
+- **pytest Suite** - 124 tests at 82% coverage across ingestion normalization, spatial schema, DAG structure, imagery pipeline, consumers, MinIO, and Snowflake loader
 
 ---
 
@@ -179,9 +171,9 @@ flowchart TD
 
 ### Prerequisites
 
-- [Docker Desktop](https://www.docker.com/)
+- [Docker Desktop](https://www.docker.com/) (16GB RAM recommended)
 - [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda
-- Python 3.13
+- Python 3.12
 
 ### Accounts Required
 
@@ -208,21 +200,34 @@ cp config/settings_example.yaml config/settings.yaml
 # edit settings.yaml with your API keys and credentials
 ```
 
-**3. Start the full pipeline:**
+**3. Create the local Conda environment (for running tests):**
+
+```bash
+conda env create -f environment.yaml
+conda activate geo-pipeline
+```
+
+**4. Start the full pipeline:**
 
 ```bash
 docker compose -f docker/docker-compose.yaml up
 ```
 
-This starts all services automatically - Kafka, PostGIS, MinIO, Airflow, all producers, consumers, and the dashboard.
+This starts all services automatically - Kafka, PostGIS, MinIO, Airflow, all ingestion producers and consumers, and the Streamlit dashboard.
 
 ### Running the Pipeline
 
-| Service | URL |
-| ------- | --- |
-| Intelligence Dashboard | http://localhost:8501 |
-| Airflow UI | http://localhost:8080 (admin / admin) |
-| MinIO Console | http://localhost:9001 (minioadmin / minioadmin) |
+Once the stack is running, the ingestion services start immediately and begin streaming live vessel and aircraft data. To run the imagery pipeline:
+
+**5. Trigger the imagery pipeline in Airflow:**
+
+Open http://localhost:8080 (admin / admin), enable the `imagery_pipeline` DAG, and trigger a manual run. The five-task pipeline fetches a Sentinel-2 tile from Copernicus, processes it into Cloud-Optimized GeoTIFFs, uploads the bands to MinIO, runs NDVI change detection, and scores anomaly patches with the pre-trained CNN. The `anomaly_loader` DAG then loads scored events into Snowflake on its daily schedule.
+
+| Service | URL | Credentials |
+| --- | --- | --- |
+| Intelligence Dashboard | http://localhost:8501 | - |
+| Airflow UI | http://localhost:8080 | admin / admin |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 
 **Run tests:**
 
@@ -272,7 +277,6 @@ geospatial-activity-pipeline/
 |-- dags/                               # Airflow DAG definitions
 |   |-- __init__.py
 |   |-- imagery_pipeline_dag.py         # Weekly Sentinel fetch, tile processing, and upload
-|   |-- track_ingestion_dag.py          # Hourly vessel and aircraft consumer orchestration
 |   |-- anomaly_loader_dag.py           # Daily scored anomaly event loading to Snowflake
 |-- ingestion/                          # AIS and ADS-B data ingestion
 │   |-- __init__.py
@@ -292,7 +296,8 @@ geospatial-activity-pipeline/
 |   |-- change_detection.py             # NDVI band-difference change detection between tile dates
 |   |-- patch_classifier.py             # PyTorch CNN scoring anomaly patches 0–1
 |   |-- anomaly_scorer.py               # Combines NDVI delta and CNN score into ranked confidence
-|   |-- weights/                        # Trained CNN model weights
+|   |-- weights/
+|       |-- patch_classifier.pt         # Pre-trained CNN model weights
 |   |-- events/                         # Scored anomaly event outputs
 |   |-- downloads/                      # Raw downloaded Sentinel tile zips
 |   |-- processed/                      # Processed Cloud-Optimized GeoTIFFs
@@ -330,8 +335,10 @@ geospatial-activity-pipeline/
 │   |-- logging_config.py               # Shared logging configuration
 |-- docs/                               # Screenshots for README
 |-- logs/                               # Runtime log output
-|-- Dockerfile                          # Single image for all pipeline services
-|-- environment.yaml                    # Conda environment spec
-|-- pytest.ini                          # pytest config with coverage settings for all pipeline modules
+|-- Dockerfile                          # Image for ingestion, consumers, and dashboard services
+|-- Dockerfile.airflow                  # Custom Airflow image with geo-pipeline conda environment
+|-- environment.yaml                    # Conda environment spec (local dev and testing)
+|-- environment.airflow.yaml            # Conda environment spec for Airflow containers
+|-- pytest.ini                          # pytest config with coverage settings
 |-- README.md
 ```
