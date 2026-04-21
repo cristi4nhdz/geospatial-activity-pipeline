@@ -9,12 +9,18 @@ services:
     restart: on-failure
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-    volumes:
-      - zk-data:/var/lib/zookeeper
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
-    depends_on: [zookeeper]
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     restart: on-failure
     ports:
       - "9092:9092"
@@ -27,14 +33,12 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    volumes:
-      - kafka-data:/var/lib/kafka/data
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 15s
       timeout: 10s
       retries: 15
-      start_period: 30s
+      start_period: 90s
 
   postgres:
     image: postgis/postgis:16-3.4
@@ -86,29 +90,33 @@ services:
       retries: 5
 
   airflow-init:
-      build:
-        context: ..
-        dockerfile: Dockerfile.airflow
-      depends_on:
-        airflow-db:
-          condition: service_healthy
-      environment:
-        AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ''
-        AIRFLOW_HOME: /opt/airflow
-        AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
-        AIRFLOW__CORE__EXECUTOR: LocalExecutor
-        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
-        AIRFLOW__CORE__FERNET_KEY: ''
-        AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-        AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
-      volumes:
-        - ../dags:/opt/airflow/dags
-        - ../imagery:/opt/airflow/imagery
-        - ../config:/opt/airflow/config
-        - airflow-logs:/opt/airflow/logs
-      command: >
-        bash -c "/opt/conda/envs/geo-pipeline/bin/airflow db migrate && /opt/conda/envs/geo-pipeline/bin/airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
-      restart: on-failure
+    build:
+      context: ..
+      dockerfile: Dockerfile.airflow
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    environment:
+      AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: ''
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'geospatial-pipeline'
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../imagery:/opt/airflow/imagery
+      - ../config:/opt/airflow/config
+      - airflow-logs:/opt/airflow/logs
+    command: >
+      bash -c "/opt/conda/envs/geo-pipeline/bin/airflow db migrate &&
+               /opt/conda/envs/geo-pipeline/bin/airflow users create
+               --username admin --password admin
+               --firstname Admin --lastname User
+               --role Admin --email admin@example.com"
+    restart: on-failure
 
   airflow-webserver:
     build:
@@ -249,12 +257,11 @@ services:
       - "8501:8501"
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../imagery:/app/imagery
     command: ["streamlit", "run", "dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
     restart: on-failure
 
 volumes:
-  zk-data:
-  kafka-data:
   postgres-data:
   minio-data:
   airflow-db-data:
