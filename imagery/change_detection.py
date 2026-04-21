@@ -12,17 +12,17 @@ import logging
 from pathlib import Path
 import numpy as np
 from minio import Minio
-
-os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
-os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
 import rasterio
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("change_detection.log")
+
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("change_detection.log")
 logger = logging.getLogger(__name__)
 
-TEMP_DIR = Path("imagery/tmp")
+TEMP_DIR = Path("/opt/airflow/imagery/tmp")
 
 
 def get_client() -> Minio:

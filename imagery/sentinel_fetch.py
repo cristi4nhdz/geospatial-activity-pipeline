@@ -12,11 +12,14 @@ from pathlib import Path
 import requests
 from config.config_loader import config
 from config.logging_config import setup_logging
+import os
 
-setup_logging("sentinel_fetch.log")
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("sentinel_fetch.log")
 logger = logging.getLogger(__name__)
 
-DOWNLOAD_DIR = Path("imagery/downloads")
+DOWNLOAD_DIR = Path("/opt/airflow/imagery/downloads")
 
 
 def get_access_token() -> str:
@@ -122,6 +125,7 @@ def download_tile(token: str, product: dict) -> Path:
         url,
         allow_redirects=False,
         timeout=30,
+        stream=True,
     )
 
     # follow redirect with auth header preserved
@@ -133,9 +137,11 @@ def download_tile(token: str, product: dict) -> Path:
 
     output_path = DOWNLOAD_DIR / f"{product_name}.zip"
     with open(output_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                f.write(chunk)
 
+    response.close()
     logger.info("Downloaded tile to: %s", output_path)
     return output_path
 

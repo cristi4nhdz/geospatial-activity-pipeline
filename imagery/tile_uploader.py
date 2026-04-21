@@ -12,10 +12,14 @@ from minio.error import S3Error
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("tile_uploader.log")
+import os
+
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("tile_uploader.log")
 logger = logging.getLogger(__name__)
 
-PROCESSED_DIR = Path("imagery/processed")
+PROCESSED_DIR = Path("/opt/airflow/imagery/processed")
 
 
 def get_client() -> Minio:

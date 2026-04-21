@@ -12,7 +12,11 @@ import snowflake.connector
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("anomaly_loader.log")
+import os
+
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("sentinel_fetch.log")
 logger = logging.getLogger(__name__)
 
 EVENTS_DIR = Path("imagery/events")

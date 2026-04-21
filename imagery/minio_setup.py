@@ -5,13 +5,15 @@ MinIO Setup Module
 Creates the sentinel-tiles bucket in MinIO if it does not already exist.
 Run once after bringing up the Docker stack.
 """
+import os
 import logging
 from minio import Minio
 from minio.error import S3Error
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("minio_setup.log")
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("minio_setup.log")
 logger = logging.getLogger(__name__)
 
 

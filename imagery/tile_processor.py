@@ -11,10 +11,6 @@ import sys
 import logging
 import zipfile
 from pathlib import Path
-
-# set GDAL env vars before rasterio loads, required for JP2 support on Windows
-os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
-os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
 import rasterio
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
@@ -24,11 +20,14 @@ from shapely.geometry import box
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-setup_logging("tile_processor.log")
+
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("tile_processor.log")
 logger = logging.getLogger(__name__)
 
-PROCESSED_DIR = Path("imagery/processed")
-EXTRACT_DIR = Path("C:/tmp/s2")
+PROCESSED_DIR = Path("/opt/airflow/imagery/processed")
+EXTRACT_DIR = Path("/tmp/s2")
 BANDS = {
     "B04": "red",
     "B08": "nir",
@@ -163,7 +162,7 @@ def main() -> None:
     """
     Process the most recently downloaded Sentinel-2 tile.
     """
-    downloads = list(Path("imagery/downloads").glob("*.zip"))
+    downloads = list(Path("/opt/airflow/imagery/downloads").glob("*.zip"))
     if not downloads:
         logger.error("No downloaded tiles found in imagery/downloads")
         return
