@@ -7,11 +7,14 @@ into Snowflake for warehousing and downstream querying.
 
 Scheduled daily.
 """
+import sys
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+
+sys.path.insert(0, "/opt/airflow")
 
 default_args = {
     "owner": "geo-pipeline",
@@ -20,7 +23,7 @@ default_args = {
     "email_on_failure": False,
 }
 
-EVENTS_DIR = Path("/opt/airflow/dags/../imagery/events")
+EVENTS_DIR = Path("/opt/airflow/imagery/events")
 
 
 def load_anomalies_to_snowflake() -> None:
@@ -43,7 +46,8 @@ def load_anomalies_to_snowflake() -> None:
     cursor = conn.cursor()
 
     # create table if not exists
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS anomaly_events (
             id INTEGER AUTOINCREMENT PRIMARY KEY,
             date_old VARCHAR,
@@ -59,11 +63,12 @@ def load_anomalies_to_snowflake() -> None:
             detected_at TIMESTAMP,
             loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
-    event_files = list(Path("imagery/events").glob("anomalies_*.json"))
+    event_files = list(EVENTS_DIR.glob("anomalies_*.json"))
     if not event_files:
-        print("No anomaly event files found")
+        print(f"No anomaly event files found in {EVENTS_DIR}")
         return
 
     total_loaded = 0
@@ -76,7 +81,8 @@ def load_anomalies_to_snowflake() -> None:
             events = json.load(f)
 
         for event in events:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO anomaly_events (
                     date_old, date_new, row_px, col_px, patch_size,
                     mean_delta, max_delta, ndvi_score, cnn_score,
@@ -86,13 +92,21 @@ def load_anomalies_to_snowflake() -> None:
                     %s, %s, %s, %s,
                     %s, %s
                 )
-            """, (
-                date_old, date_new,
-                event["row"], event["col"], event["patch_size"],
-                event["mean_delta"], event["max_delta"],
-                event["ndvi_score"], event["cnn_score"],
-                event["confidence"], event["detected_at"],
-            ))
+            """,
+                (
+                    date_old,
+                    date_new,
+                    event["row"],
+                    event["col"],
+                    event["patch_size"],
+                    event["mean_delta"],
+                    event["max_delta"],
+                    event["ndvi_score"],
+                    event["cnn_score"],
+                    event["confidence"],
+                    event["detected_at"],
+                ),
+            )
             total_loaded += 1
 
     conn.commit()
