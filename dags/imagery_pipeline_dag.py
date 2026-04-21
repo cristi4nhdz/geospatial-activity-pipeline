@@ -5,11 +5,14 @@ Imagery Pipeline DAG
 Orchestrates the full Sentinel-2 imagery pipeline:
 fetch -> process -> upload -> change detection -> anomaly scoring
 
-Scheduled every 5 days to match Sentinel-2 revisit time.
+Scheduled weekly to match Sentinel-2 revisit time.
 """
+import sys
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+
+sys.path.insert(0, "/opt/airflow")
 
 default_args = {
     "owner": "geo-pipeline",
