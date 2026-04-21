@@ -13,9 +13,6 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
-
-os.environ["GDAL_DATA"] = sys.prefix + "/Library/share/gdal"
-os.environ["GDAL_DRIVER_PATH"] = sys.prefix + "/Library/lib/gdalplugins"
 from config.config_loader import config
 from config.logging_config import setup_logging
 from imagery.change_detection import (
@@ -27,10 +24,13 @@ from imagery.change_detection import (
 )
 from imagery.patch_classifier import PatchCNN, load_model, score_patch
 
-setup_logging("anomaly_scorer.log")
+# Only set up logging if not running inside Airflow
+if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
+    setup_logging("anomaly_scorer.log")
+
 logger = logging.getLogger(__name__)
 
-EVENTS_DIR = Path("imagery/events")
+EVENTS_DIR = Path("/opt/airflow/imagery/events")
 
 
 def score_anomalies(

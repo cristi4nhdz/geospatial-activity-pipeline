@@ -1,0 +1,27 @@
+# environment.airflow.yaml
+---
+name: geo-pipeline
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - gdal
+  - rasterio
+  - libgdal-jp2openjpeg
+  - pytorch
+  - torchvision
+  - pip
+  - pip:
+      - kafka-python
+      - psycopg2-binary
+      - python-dotenv
+      - requests
+      - websockets
+      - pydantic
+      - loguru
+      - pyyaml
+      - minio
+      - shapely
+      - snowflake-connector-python
+      - apache-airflow==2.9.0

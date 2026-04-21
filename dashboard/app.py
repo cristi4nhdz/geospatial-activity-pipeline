@@ -1259,7 +1259,7 @@ def render_sentinel_anomaly_views(
                         )
                     st.image(
                         img_old,
-                        caption=f"{meta_old['name']} — {meta_old['mode_desc']}",
+                        caption=f"{meta_old['name']} - {meta_old['mode_desc']}",
                         use_container_width=True,
                     )
                 except Exception as e:
@@ -1283,7 +1283,7 @@ def render_sentinel_anomaly_views(
                         )
                     st.image(
                         img_new,
-                        caption=f"{meta_new['name']} — {meta_new['mode_desc']}",
+                        caption=f"{meta_new['name']} - {meta_new['mode_desc']}",
                         use_container_width=True,
                     )
                 except Exception as e:
@@ -1309,7 +1309,7 @@ def render_sentinel_anomaly_views(
                     )
                     st.image(
                         patch_old,
-                        caption=f"{diag_old['name']} — patch @ row {row_px}, col {col_px}",
+                        caption=f"{diag_old['name']} - patch @ row {row_px}, col {col_px}",
                         use_container_width=True,
                     )
                     render_quality_chips(diag_old)
@@ -1328,7 +1328,7 @@ def render_sentinel_anomaly_views(
                     )
                     st.image(
                         patch_new,
-                        caption=f"{diag_new['name']} — patch @ row {row_px}, col {col_px}",
+                        caption=f"{diag_new['name']} - patch @ row {row_px}, col {col_px}",
                         use_container_width=True,
                     )
                     render_quality_chips(diag_new)
@@ -1373,7 +1373,7 @@ def main() -> None:
             <div class="dash-badge">LIVE</div>
         </div>
         <div class="dash-subtitle">
-            {AOI_NAME} — {AOI_SUBTITLE}
+            {AOI_NAME} - {AOI_SUBTITLE}
         </div>
         """,
         unsafe_allow_html=True,
@@ -1684,7 +1684,7 @@ def main() -> None:
         map_col, detail_col = st.columns([2.2, 1])
 
         with map_col:
-            vessel_options: dict[str, int | None] = {"None — show all vessels": None}
+            vessel_options: dict[str, int | None] = {"None - show all vessels": None}
             if not filtered_vessels.empty and show_vessels:
                 for _, r in filtered_vessels.sort_values("vessel_name").iterrows():
                     label = f"{r['vessel_name']} ({int(r['mmsi'])})"
@@ -1692,7 +1692,7 @@ def main() -> None:
                         label += " 🟡"
                     vessel_options[label] = int(r["mmsi"])
 
-            current_vessel_label = "None — show all vessels"
+            current_vessel_label = "None - show all vessels"
             if st.session_state.selected_vessel_mmsi is not None:
                 for label, mmsi in vessel_options.items():
                     if mmsi == st.session_state.selected_vessel_mmsi:
@@ -1713,7 +1713,7 @@ def main() -> None:
                     st.session_state.selected_aircraft_icao24 = None
                 st.rerun()
 
-            aircraft_options: dict[str, str | None] = {"None — show all aircraft": None}
+            aircraft_options: dict[str, str | None] = {"None - show all aircraft": None}
             if not filtered_aircraft.empty and show_aircraft:
                 aircraft_sorted = filtered_aircraft.copy()
                 aircraft_sorted["callsign_clean"] = (
@@ -1730,7 +1730,7 @@ def main() -> None:
                     label = f"{callsign} ({r['icao24']})"
                     aircraft_options[label] = str(r["icao24"])
 
-            current_aircraft_label = "None — show all aircraft"
+            current_aircraft_label = "None - show all aircraft"
             if st.session_state.selected_aircraft_icao24 is not None:
                 for label, icao24 in aircraft_options.items():
                     if icao24 == st.session_state.selected_aircraft_icao24:
@@ -2028,6 +2028,7 @@ def main() -> None:
                 )
             filtered_corr = correlated_df.copy()
             if not filtered_corr.empty:
+                filtered_corr = filtered_corr.drop_duplicates(subset="anomaly_id")
                 filtered_corr = filtered_corr[
                     (filtered_corr["confidence"] >= conf_threshold)
                     & (filtered_corr["ndvi_delta"] >= ndvi_threshold)
@@ -2186,6 +2187,7 @@ def main() -> None:
         )
 
         corr_df_tab = correlated_df.copy()
+        corr_df_tab = corr_df_tab.drop_duplicates(subset="anomaly_id")
 
         if corr_df_tab.empty:
             st.info("No correlated events match current filters.")

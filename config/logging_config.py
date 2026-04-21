@@ -23,24 +23,17 @@ def setup_logging(log_file: str = "app.log") -> None:
     Returns:
         None
     """
-    # docker version
-    # os.makedirs("/app/logs", exist_ok=True)
+    log_dir = "/opt/airflow/logs"
+    os.makedirs(log_dir, exist_ok=True)
 
-    # logging.basicConfig(
-    #    level=logging.INFO,
-    #    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
-    #    handlers=[
-    #        logging.FileHandler("/app/logs/ingestion.log"),
-    #        logging.StreamHandler(),
-    #    ],
-    # )
+    log_path = os.path.join(log_dir, log_file)
 
-    # local dev
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s - %(message)s",
         handlers=[
-            logging.FileHandler(rf"logs\{log_file}"),
+            logging.FileHandler(log_path),
             logging.StreamHandler(),
         ],
+        force=True,
     )
