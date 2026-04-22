@@ -111,11 +111,7 @@ services:
       - ../config:/opt/airflow/config
       - airflow-logs:/opt/airflow/logs
     command: >
-      bash -c "/opt/conda/envs/geo-pipeline/bin/airflow db migrate &&
-               /opt/conda/envs/geo-pipeline/bin/airflow users create
-               --username admin --password admin
-               --firstname Admin --lastname User
-               --role Admin --email admin@example.com"
+          bash -c "/opt/conda/envs/geo-pipeline/bin/airflow db migrate && /opt/conda/envs/geo-pipeline/bin/airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
     restart: on-failure
 
   airflow-webserver:
@@ -180,8 +176,11 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "imagery.minio_setup"]
     restart: on-failure
 
@@ -189,8 +188,11 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "snowflake_loader.setup"]
     restart: on-failure
 
@@ -201,8 +203,11 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "ingestion.ais_producer"]
     restart: on-failure
 
@@ -213,8 +218,11 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "ingestion.adsb_producer"]
     restart: on-failure
 
@@ -227,8 +235,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "ingestion.consumers.vessel_consumer"]
     restart: on-failure
 
@@ -241,8 +252,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
+      - ../logs:/app/logs
     command: ["python", "-m", "ingestion.consumers.aircraft_consumer"]
     restart: on-failure
 
@@ -255,9 +269,12 @@ services:
         condition: service_healthy
     ports:
       - "8501:8501"
+    environment:
+      LOG_DIR: /app/logs
     volumes:
       - ../config/settings.yaml:/app/config/settings.yaml
       - ../imagery:/app/imagery
+      - ../logs:/app/logs
     command: ["streamlit", "run", "dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
     restart: on-failure
 
