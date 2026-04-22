@@ -7,7 +7,6 @@ reprojects to WGS84, clips to the configured AOI bounding box,
 and converts to Cloud-Optimized GeoTIFF (COG) format.
 """
 import os
-import sys
 import logging
 import zipfile
 from pathlib import Path
@@ -21,7 +20,6 @@ from config.config_loader import config
 from config.logging_config import setup_logging
 
 
-# Only set up logging if not running inside Airflow
 if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
     setup_logging("tile_processor.log")
 logger = logging.getLogger(__name__)

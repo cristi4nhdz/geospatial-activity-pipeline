@@ -7,7 +7,6 @@ to produce a final confidence score for each anomaly patch.
 Outputs scored anomaly events ready for Snowflake loading.
 """
 import os
-import sys
 import json
 import logging
 from datetime import datetime, timezone
@@ -24,10 +23,8 @@ from imagery.change_detection import (
 )
 from imagery.patch_classifier import PatchCNN, load_model, score_patch
 
-# Only set up logging if not running inside Airflow
 if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
     setup_logging("anomaly_scorer.log")
-
 logger = logging.getLogger(__name__)
 
 EVENTS_DIR = Path("/opt/airflow/imagery/events")
