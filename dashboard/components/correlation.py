@@ -7,9 +7,10 @@ and aircraft tracks in space and time.
 from __future__ import annotations
 import logging
 from math import atan2, cos, radians, sin, sqrt
-
 import pandas as pd
+from config.logging_config import setup_logging
 
+setup_logging("dashboard.log")
 logger = logging.getLogger(__name__)
 
 EARTH_RADIUS_KM = 6371.0

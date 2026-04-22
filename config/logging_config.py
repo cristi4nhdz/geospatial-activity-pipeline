@@ -23,7 +23,7 @@ def setup_logging(log_file: str = "app.log") -> None:
     Returns:
         None
     """
-    log_dir = "/opt/airflow/logs"
+    log_dir = os.environ.get("LOG_DIR", "logs")
     os.makedirs(log_dir, exist_ok=True)
 
     log_path = os.path.join(log_dir, log_file)

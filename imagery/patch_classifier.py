@@ -24,10 +24,8 @@ from imagery.change_detection import (
 )
 import os
 
-# Only set up logging if not running inside Airflow
 if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
     setup_logging("patch_classifier.log")
-
 logger = logging.getLogger(__name__)
 
 WEIGHTS_DIR = Path("/opt/airflow/imagery/weights")

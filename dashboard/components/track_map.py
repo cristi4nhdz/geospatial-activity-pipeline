@@ -10,13 +10,13 @@ import logging
 import math
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
-
 import pandas as pd
 import psycopg2
 import streamlit as st
-
 from config.config_loader import config
+from config.logging_config import setup_logging
 
+setup_logging("dashboard.log")
 logger = logging.getLogger(__name__)
 
 

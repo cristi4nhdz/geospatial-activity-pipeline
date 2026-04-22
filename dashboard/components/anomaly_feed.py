@@ -12,9 +12,10 @@ from contextlib import closing
 import pandas as pd
 import snowflake.connector
 import streamlit as st
-
 from config.config_loader import config
+from config.logging_config import setup_logging
 
+setup_logging("dashboard.log")
 logger = logging.getLogger(__name__)
 
 

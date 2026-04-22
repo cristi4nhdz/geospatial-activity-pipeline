@@ -7,7 +7,6 @@ computes NDVI delta between them, and flags anomaly patches where
 the change exceeds the configured threshold.
 """
 import os
-import sys
 import logging
 from pathlib import Path
 import numpy as np
@@ -16,8 +15,6 @@ import rasterio
 from config.config_loader import config
 from config.logging_config import setup_logging
 
-
-# Only set up logging if not running inside Airflow
 if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
     setup_logging("change_detection.log")
 logger = logging.getLogger(__name__)
