@@ -14,6 +14,7 @@ from minio import Minio
 import rasterio
 from config.config_loader import config
 from config.logging_config import setup_logging
+from rasterio.warp import reproject, Resampling
 
 if not os.environ.get("AIRFLOW_CTX_DAG_ID"):
     setup_logging("change_detection.log")
@@ -93,16 +94,52 @@ def compute_ndvi(b04_path: Path, b08_path: Path) -> np.ndarray:
     """
     with rasterio.open(b04_path) as src:
         b04 = src.read(1).astype(float)
+        profile = src.profile.copy()
+
     with rasterio.open(b08_path) as src:
         b08 = src.read(1).astype(float)
 
     np.seterr(divide="ignore", invalid="ignore")
-    ndvi = np.where(
-        (b08 + b04) == 0,
-        0,
-        (b08 - b04) / (b08 + b04),
+    ndvi = np.where((b08 + b04) == 0, 0, (b08 - b04) / (b08 + b04))
+
+    return ndvi, profile
+
+
+def align_to_reference(
+    src_array: np.ndarray,
+    src_profile: dict,
+    ref_profile: dict,
+) -> np.ndarray:
+    """
+    Reproject and resample a source array to match a reference raster grid.
+
+    This ensures both arrays share the same CRS, transform, resolution,
+    width, and height so they can be compared pixel-by-pixel.
+
+    Args:
+        src_array: Source array to be aligned.
+        src_profile: Raster profile of the source array.
+        ref_profile: Raster profile of the reference grid.
+
+    Returns:
+        2D numpy array aligned to the reference raster grid.
+    """
+    aligned = np.empty(
+        (ref_profile["height"], ref_profile["width"]),
+        dtype=src_array.dtype,
     )
-    return ndvi
+
+    reproject(
+        source=src_array,
+        destination=aligned,
+        src_transform=src_profile["transform"],
+        src_crs=src_profile["crs"],
+        dst_transform=ref_profile["transform"],
+        dst_crs=ref_profile["crs"],
+        resampling=Resampling.bilinear,
+    )
+
+    return aligned
 
 
 def detect_anomalies(
@@ -173,8 +210,16 @@ def run(date_old: str, date_new: str) -> list[dict]:
     b08_new = download_band(client, bucket, date_new, "B08")
 
     # compute NDVI for both dates
-    ndvi_old = compute_ndvi(b04_old, b08_old)
-    ndvi_new = compute_ndvi(b04_new, b08_new)
+    ndvi_old, old_profile = compute_ndvi(b04_old, b08_old)
+    ndvi_new, new_profile = compute_ndvi(b04_new, b08_new)
+
+    if ndvi_old.shape != ndvi_new.shape:
+        logger.warning(
+            "NDVI shapes differ; aligning new NDVI to old grid: old=%s new=%s",
+            ndvi_old.shape,
+            ndvi_new.shape,
+        )
+        ndvi_new = align_to_reference(ndvi_new, new_profile, old_profile)
 
     logger.info(
         "NDVI old shape: %s | NDVI new shape: %s", ndvi_old.shape, ndvi_new.shape

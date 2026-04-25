@@ -20,6 +20,7 @@ from imagery.change_detection import (
     download_band,
     get_client,
     list_dates,
+    align_to_reference,
 )
 from imagery.patch_classifier import PatchCNN, load_model, score_patch
 
@@ -136,8 +137,17 @@ def run(date_old: str, date_new: str) -> list[dict]:
     b04_new = download_band(client, bucket, date_new, "B04")
     b08_new = download_band(client, bucket, date_new, "B08")
 
-    ndvi_old = compute_ndvi(b04_old, b08_old)
-    ndvi_new = compute_ndvi(b04_new, b08_new)
+    ndvi_old, old_profile = compute_ndvi(b04_old, b08_old)
+    ndvi_new, new_profile = compute_ndvi(b04_new, b08_new)
+
+    if ndvi_old.shape != ndvi_new.shape:
+        logger.warning(
+            "NDVI shapes differ; aligning new NDVI to old grid: old=%s new=%s",
+            ndvi_old.shape,
+            ndvi_new.shape,
+        )
+        ndvi_new = align_to_reference(ndvi_new, new_profile, old_profile)
+
     ndvi_delta = np.abs(ndvi_new - ndvi_old)
 
     anomalies = detect_anomalies(

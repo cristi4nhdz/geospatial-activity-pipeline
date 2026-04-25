@@ -133,6 +133,7 @@ class TestImageryPipelineDag:
         """DAG has task dependency chain."""
         assert ">>" in self.source
 
+
 class TestAnomalyLoaderDag:
     """Tests for anomaly_loader_dag.py structure."""
 

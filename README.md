@@ -100,17 +100,21 @@ flowchart TD
 
 ![Mission Overview](docs/mission_overview.png)
 
-### Live Tracking
+### Live Tracking - Vessel
 
-![Live Tracking](docs/live_tracking.png)
+![Live Tracking - Vessel](docs/live_tracking_vessel.png)
 
-### Land Change Detection
+### Live Tracking - Aircraft
 
-![Land Change Detection](docs/land_change_detection.png)
+![Live Tracking - Aircraft](docs/live_tracking_aircraft.png)
 
 ### Sentinel Scene Preview
 
 ![Sentinel Preview](docs/sentinel_preview.png)
+
+### Land Change Detection
+
+![Land Change Detection](docs/land_change_detection.png)
 
 ### Anomaly Patch Crop
 
@@ -120,9 +124,13 @@ flowchart TD
 
 ![Correlated Events](docs/correlated_events.png)
 
-### Analyst Assessment
+### Airflow Schedules DAGS
 
-![Analyst Assessment](docs/analyst_assessment.png)
+![Airflow Scheduled DAGS](docs/airflow_scheduled_dags.png)
+
+### GitHub Actions CI
+
+![github_actions_ci_tests](docs/github_actions_ci_tests.png)
 
 ---
 
