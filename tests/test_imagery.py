@@ -44,7 +44,7 @@ class TestComputeNDVI:
         with rasterio.open(b08_path, "w", **profile) as dst:
             dst.write(b08_data)
 
-        ndvi = compute_ndvi(b04_path, b08_path)
+        ndvi, _ = compute_ndvi(b04_path, b08_path)
         assert ndvi.shape == (100, 100)
         expected = (3000 - 1000) / (3000 + 1000)
         assert np.allclose(ndvi, expected, atol=0.001)
@@ -79,7 +79,7 @@ class TestComputeNDVI:
         with rasterio.open(b08_path, "w", **profile) as dst:
             dst.write(np.zeros((1, 10, 10), dtype=np.float32))
 
-        ndvi = compute_ndvi(b04_path, b08_path)
+        ndvi, _ = compute_ndvi(b04_path, b08_path)
         assert not np.any(np.isnan(ndvi))
         assert np.all(ndvi == 0)
 
@@ -114,7 +114,7 @@ class TestComputeNDVI:
         with rasterio.open(b08_path, "w", **profile) as dst:
             dst.write(rng.integers(0, 5000, (1, 50, 50)).astype(np.float32))
 
-        ndvi = compute_ndvi(b04_path, b08_path)
+        ndvi, _ = compute_ndvi(b04_path, b08_path)
         assert np.all(ndvi >= -1.0)
         assert np.all(ndvi <= 1.0)
 
